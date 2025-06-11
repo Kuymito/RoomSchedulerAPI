@@ -1,25 +1,34 @@
 package org.example.roomschedulerapi.classroomscheduler.model; // Adjust to your package
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 @Entity
+@Getter
+@Setter
 @Table(name = "instructor") // Matches the PostgreSQL table name
-public class Instructor {
+public class Instructor implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "instructor_id")
     private Long instructorId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "role_id", nullable = false)
-    private Role role; // Assumes Role entity exists
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id")
+    private Role role;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "department_id", nullable = false)
-    private Department department; // The join column "department_id" IS numeric
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "department_id")
+    private Department department;
 
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
@@ -62,109 +71,7 @@ public class Instructor {
     public Instructor() {
     }
 
-    public Long getInstructorId() {
-        return instructorId;
-    }
 
-    public void setInstructorId(Long instructorId) {
-        this.instructorId = instructorId;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
-    }
-
-    public Department getDepartment() {
-        return department;
-    }
-
-    public void setDepartment(Department department) {
-        this.department = department;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
-    public String getProfile() {
-        return profile;
-    }
-
-    public void setProfile(String profile) {
-        this.profile = profile;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    public String getDegree() {
-        return degree;
-    }
-
-    public void setDegree(String degree) {
-        this.degree = degree;
-    }
-
-    public String getMajor() {
-        return major;
-    }
-
-    public void setMajor(String major) {
-        this.major = major;
-    }
-
-    public String getAddress() {
-        return address;
-    }
-
-    public void setAddress(String address) {
-        this.address = address;
-    }
-
-    public boolean isArchived() {
-        return isArchived;
-    }
-
-    public void setArchived(boolean archived) {
-        isArchived = archived;
-    }
 
     // public Set<Class> getClassesTaught() {
     //     return classesTaught;
@@ -173,6 +80,38 @@ public class Instructor {
     // public void setClassesTaught(Set<Class> classesTaught) {
     //     this.classesTaught = classesTaught;
     // }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        // The authority should be the role name, e.g., "ROLE_INSTRUCTOR", "ROLE_ADMIN"
+        return List.of(new SimpleGrantedAuthority(role.getRoleName()));
+    }
+
+    @Override
+    public String getUsername() {
+        // Use email as the username for authentication
+        return email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return !isArchived; // An archived user is disabled
+    }
 
     @Override
     public boolean equals(Object o) {
