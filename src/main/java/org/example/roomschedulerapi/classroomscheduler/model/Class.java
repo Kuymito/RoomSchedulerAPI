@@ -45,6 +45,9 @@ public class Class {
     @Column(name = "degree", length = 100) // Mapped to degree in the database
     private String degreeName;
 
+    @Column(name = "semester", length = 100)
+    private String semester;
+
     @Column(name = "is_online") // Defaults to false in DB
     private boolean isOnline = false;
 
@@ -194,6 +197,14 @@ public class Class {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getSemester() {
+        return semester;
+    }
+
+    public void setSemester(String semester) {
+        this.semester = semester;
     }
 
     @Override

@@ -94,6 +94,7 @@ public class ClassServiceImpl implements ClassService {
                 aClass.getGroupName(),
                 aClass.getMajorName(),    // Assuming these fields exist on your Class entity
                 aClass.getDegreeName(),   // Assuming these fields exist on your Class entity
+                aClass.getSemester(),
                 aClass.isOnline(),
                 aClass.isFree(),
                 aClass.isIs_archived(),    // Getter for is_archived

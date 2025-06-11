@@ -28,7 +28,7 @@ public class Room {
     @Column(name = "type")
     private String type;
 
-    @Column(name = "equipment") // Stored as a simple String (e.g., "Projector, Whiteboard")
+    @Column(name = "equipment")
     private String equipment;
 
     @Column(name = "is_available")

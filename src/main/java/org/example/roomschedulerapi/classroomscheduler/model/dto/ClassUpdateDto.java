@@ -7,7 +7,6 @@ public class ClassUpdateDto {
     private String className; // Renamed from courseName
 
     // @PositiveOrZero(message = "Credits must be zero or positive")
-    private Integer credits; // This field is not in the current Class JPA entity
 
     private String generation;
     private String groupName;
@@ -30,14 +29,6 @@ public class ClassUpdateDto {
 
     public void setClassName(String className) {
         this.className = className;
-    }
-
-    public Integer getCredits() {
-        return credits;
-    }
-
-    public void setCredits(Integer credits) {
-        this.credits = credits;
     }
 
     public String getGeneration() {

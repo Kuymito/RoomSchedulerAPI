@@ -14,6 +14,7 @@ public class ClassResponseDto {
     private String groupName;   // Mapped from groupName in your Class entity
     private String majorName;   // Mapped from majorName in your Class entity
     private String degreeName;  // Mapped from degreeName in your Class entity
+    private String semester;
     private boolean isOnline;
     private boolean isFree;
     private boolean isArchived; // Mapped from is_archived in your Class entity
@@ -25,13 +26,14 @@ public class ClassResponseDto {
     private DepartmentResponseDto department; // Use the new DepartmentResponseDto
     private ShiftResponseDto shift;       // Use the new ShiftResponseDto
 
-    public ClassResponseDto(Long classId, String className, String generation, String groupName, String majorName, String degreeName, boolean isOnline, boolean isFree, boolean isArchived, LocalDateTime createdAt, LocalDateTime archivedAt, InstructorResponseDto instructor, DepartmentResponseDto department, ShiftResponseDto shift) {
+    public ClassResponseDto(Long classId, String className, String generation, String groupName, String majorName, String degreeName, String semester, boolean isOnline, boolean isFree, boolean isArchived, LocalDateTime createdAt, LocalDateTime archivedAt, InstructorResponseDto instructor, DepartmentResponseDto department, ShiftResponseDto shift) {
         this.classId = classId;
         this.className = className;
         this.generation = generation;
         this.groupName = groupName;
         this.majorName = majorName;
         this.degreeName = degreeName;
+        this.semester = semester;
         this.isOnline = isOnline;
         this.isFree = isFree;
         this.isArchived = isArchived;
@@ -154,5 +156,13 @@ public class ClassResponseDto {
 
     public void setShift(ShiftResponseDto shift) {
         this.shift = shift;
+    }
+
+    public String getSemester() {
+        return semester;
+    }
+
+    public void setSemester(String semester) {
+        this.semester = semester;
     }
 }

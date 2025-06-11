@@ -6,8 +6,6 @@ import lombok.Setter;
 
 @Getter
 @Setter
-
-@AllArgsConstructor
 public class InstructorResponseDto {
     private Long instructorId;
     private String firstName;
