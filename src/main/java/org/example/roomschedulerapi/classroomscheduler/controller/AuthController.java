@@ -47,6 +47,7 @@ public class AuthController {
         }
     }
 
+    @CrossOrigin(origins = "http://localhost:3000")
     @PostMapping("/login")
     public AuthResponseDto createAuthenticationToken(@RequestBody AuthRequestDto authRequest) throws Exception {
         try {

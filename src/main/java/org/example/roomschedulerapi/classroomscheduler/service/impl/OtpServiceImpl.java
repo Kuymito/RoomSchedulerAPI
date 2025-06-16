@@ -27,14 +27,9 @@ public class OtpServiceImpl implements OtpService {
                 });
     }
 
-    /**
-     * Generates a 6-digit OTP and caches it with the provided key (e.g., email).
-     * @param key The identifier for the OTP (e.g., user's email).
-     * @return The generated OTP string.
-     */
     public String generateOtp(String key) {
         Random random = new Random();
-        int otpValue = 100000 + random.nextInt(900000); // Generates a number between 100000 and 999999
+        int otpValue = 1000 + random.nextInt(9000); // Generates a number between 1000 and 9999
         String otp = String.valueOf(otpValue);
         otpCache.put(key, otp);
         return otp;

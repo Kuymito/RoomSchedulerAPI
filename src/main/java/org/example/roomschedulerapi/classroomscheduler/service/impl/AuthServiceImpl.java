@@ -73,12 +73,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponseDto login(AuthRequestDto request) {
-        // Authenticate the user. If credentials are bad, it will throw an exception.
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
-
-        // If authentication is successful, find the user and generate a token
         UserDetails userDetails = instructorRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new NoSuchElementException("User not found after authentication."));
 
@@ -91,7 +88,6 @@ public class AuthServiceImpl implements AuthService {
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
-        // The principal is the UserDetails object we set in JwtAuthFilter
         return authentication.getPrincipal();
     }
 }

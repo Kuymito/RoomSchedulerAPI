@@ -12,7 +12,7 @@ public class OtpValidationDto {
     private String email;
 
     @NotBlank(message = "OTP is required")
-    @Size(min = 6, max = 6, message = "OTP must be 6 digits")
+    @Size(min = 4, max = 4, message = "OTP must be 6 digits")
     private String otp;
 
     public OtpValidationDto(String email, String otp) {

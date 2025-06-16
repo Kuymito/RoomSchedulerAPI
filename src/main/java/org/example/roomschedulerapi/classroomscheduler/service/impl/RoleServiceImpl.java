@@ -53,8 +53,6 @@ public class RoleServiceImpl implements RoleService {
         try {
             roleRepository.deleteById(roleId);
         } catch (DataIntegrityViolationException e) {
-            // This exception is typically thrown if the role is still assigned to instructors
-            // due to the ON DELETE RESTRICT foreign key constraint.
             throw new DataIntegrityViolationException(
                     "Cannot delete role with ID " + roleId + " as it is currently assigned to one or more instructors."
             );
