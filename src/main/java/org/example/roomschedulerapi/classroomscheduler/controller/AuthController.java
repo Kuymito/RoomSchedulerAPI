@@ -4,9 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.config.security.JwtUtil;
 import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.AuthRequestDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.AuthResponseDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.RegisterRequestDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
 import org.example.roomschedulerapi.classroomscheduler.service.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -79,6 +77,44 @@ public class AuthController {
         } else {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse<>(
                     "Unauthorized: No valid token provided.", null, HttpStatus.UNAUTHORIZED, LocalDateTime.now()));
+        }
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDto request) {
+        // Always return a generic success message to prevent user enumeration attacks
+        // The frontendResetUrl should be configured in your application properties or sent by the client
+        String frontendUrl = "http://localhost:3000/auth/reset-password";
+        authService.processForgotPassword(request.getEmail(), frontendUrl);
+
+        return ResponseEntity.ok(new ApiResponse<>(
+                "If an account with that email exists, a password reset link has been sent.",
+                null, HttpStatus.OK, LocalDateTime.now()));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<String>> resetPassword(@Valid @RequestBody ResetPasswordRequestDto request) {
+        try {
+            authService.resetPassword(request.getToken(), request.getNewPassword());
+            return ResponseEntity.ok(new ApiResponse<>(
+                    "Password has been reset successfully.",
+                    null, HttpStatus.OK, LocalDateTime.now()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(
+                    "Error resetting password: " + e.getMessage(), null, HttpStatus.BAD_REQUEST, LocalDateTime.now()));
+        }
+    }
+
+    @PostMapping("/reset-password-with-otp")
+    public ResponseEntity<ApiResponse<String>> resetPasswordWithOtp(@Valid @RequestBody ResetPasswordWithOtpRequestDto request) {
+        try {
+            authService.resetPasswordWithOtp(request);
+            return ResponseEntity.ok(new ApiResponse<>(
+                    "Password has been reset successfully.",
+                    null, HttpStatus.OK, LocalDateTime.now()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(
+                    "Error resetting password: " + e.getMessage(), null, HttpStatus.BAD_REQUEST, LocalDateTime.now()));
         }
     }
 }
