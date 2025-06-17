@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
 // --- Add these annotations for Swagger JWT UI ---
@@ -25,6 +26,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
         bearerFormat = "JWT",           // The format of the token
         in = SecuritySchemeIn.HEADER    // Where the token is located (in the request header)
 )
+@EnableAsync
 public class RoomSchedulerApiApplication {
 
     public static void main(String[] args) {
