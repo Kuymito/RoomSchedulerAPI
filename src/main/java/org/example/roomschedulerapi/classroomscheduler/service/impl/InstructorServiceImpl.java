@@ -1,5 +1,6 @@
 package org.example.roomschedulerapi.classroomscheduler.service.impl; // Adjust to your package
 
+import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.model.Department;
 import org.example.roomschedulerapi.classroomscheduler.model.Instructor;
 import org.example.roomschedulerapi.classroomscheduler.model.Role;
@@ -11,6 +12,7 @@ import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepo
 import org.example.roomschedulerapi.classroomscheduler.repository.RoleRepository;
 import org.example.roomschedulerapi.classroomscheduler.service.InstructorService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,23 +22,15 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class InstructorServiceImpl implements InstructorService {
 
     private final InstructorRepository instructorRepository;
     private final RoleRepository roleRepository; // To fetch Role by ID
     private final DepartmentRepository departmentRepository; // To fetch Department by ID
-    // private final PasswordEncoder passwordEncoder; // Inject if using Spring Security for hashing
+    private final PasswordEncoder passwordEncoder; // Inject if using Spring Security for hashing
 
-    @Autowired
-    public InstructorServiceImpl(InstructorRepository instructorRepository,
-                                 RoleRepository roleRepository,
-                                 DepartmentRepository departmentRepository
-            /*, PasswordEncoder passwordEncoder */) {
-        this.instructorRepository = instructorRepository;
-        this.roleRepository = roleRepository;
-        this.departmentRepository = departmentRepository;
-        // this.passwordEncoder = passwordEncoder;
-    }
+
 
     private InstructorResponseDto convertToDto(Instructor instructor) {
         if (instructor == null) {
@@ -110,9 +104,11 @@ public class InstructorServiceImpl implements InstructorService {
     @Override
     @Transactional
     public InstructorResponseDto updateInstructor(Long instructorId, InstructorUpdateDto dto) {
+        // 1. Fetch the existing instructor entity
         Instructor instructor = instructorRepository.findById(instructorId)
                 .orElseThrow(() -> new NoSuchElementException("Instructor not found with id: " + instructorId));
 
+        // 2. Update all provided fields from the DTO
         if (dto.getFirstName() != null) {
             instructor.setFirstName(dto.getFirstName());
         }
@@ -127,12 +123,12 @@ public class InstructorServiceImpl implements InstructorService {
                         throw new IllegalArgumentException("Email already in use: " + dto.getEmail());
                     }
                 });
+                instructor.setEmail(dto.getEmail());
             }
-            instructor.setEmail(dto.getEmail());
         }
         if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
-            // instructor.setPassword(passwordEncoder.encode(dto.getPassword())); // Hash new password
-            instructor.setPassword(dto.getPassword()); // TODO: HASH PASSWORD PROPERLY
+            // ✅ CORRECTED: Always encode the password before saving
+            instructor.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
         if (dto.getPhone() != null) {
             instructor.setPhone(dto.getPhone());
@@ -159,12 +155,15 @@ public class InstructorServiceImpl implements InstructorService {
                     .orElseThrow(() -> new NoSuchElementException("Department not found with id: " + dto.getDepartmentId()));
             instructor.setDepartment(department);
         }
-        if (dto.getIsArchived() != null) { // For explicit archive via update DTO
+        if (dto.getIsArchived() != null) {
             instructor.setArchived(dto.getIsArchived());
         }
 
+        // 3. Save the updated entity
         Instructor updatedInstructor = instructorRepository.save(instructor);
-        return convertToDto(updatedInstructor);
+
+        // 4. Convert to DTO and return
+        return convertToDto(updatedInstructor); // Assuming you have this helper method
     }
 
     @Override

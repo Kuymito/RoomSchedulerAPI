@@ -46,6 +46,10 @@ public class Admin implements UserDetails {
         return email;
     }
 
+    public String getFullName() {
+        return (this.firstName != null ? this.firstName : "") + " " + (this.lastName != null ? this.lastName : "");
+    }
+
     @Override
     public boolean isAccountNonExpired() {
         return true;
