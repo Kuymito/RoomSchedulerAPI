@@ -1,0 +1,3 @@
+org\example\roomschedulerapi\classroomscheduler\config\WebConfig.class
+org\example\roomschedulerapi\classroomscheduler\config\security\JwtAuthFilter.class
+org\example\roomschedulerapi\RoomSchedulerApiApplication.class
