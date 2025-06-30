@@ -2,10 +2,15 @@ package org.example.roomschedulerapi.classroomscheduler.model;
 
 import jakarta.persistence.*;
 
+import java.util.List;
 import java.util.Objects;
 
 @Entity
 @Table(name = "rooms")
+@NamedEntityGraph(
+        name = "Room.withAvailability",
+        attributeNodes = @NamedAttributeNode("availability")
+)
 public class Room {
 
     @Id
@@ -31,8 +36,8 @@ public class Room {
     @Column(name = "equipment")
     private String equipment;
 
-    @Column(name = "is_available")
-    private Boolean isAvailable;
+    @OneToMany(mappedBy = "room", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<RoomAvailability> availability;
 
     // --- Constructors ---
     public Room() {}
@@ -60,8 +65,15 @@ public class Room {
     public void setEquipment(String equipment) { this.equipment = equipment; }
 
     // Standard getter/setter for a boolean property named 'isAvailable'
-    public Boolean getIsAvailable() { return isAvailable; }
-    public void setIsAvailable(Boolean available) { isAvailable = available; }
+
+
+    public List<RoomAvailability> getAvailability() {
+        return availability;
+    }
+
+    public void setAvailability(List<RoomAvailability> availability) {
+        this.availability = availability;
+    }
 
     @Override
     public boolean equals(Object o) {

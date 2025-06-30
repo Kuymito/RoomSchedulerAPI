@@ -6,10 +6,7 @@ import org.example.roomschedulerapi.classroomscheduler.model.Admin;
 import org.example.roomschedulerapi.classroomscheduler.model.Department;
 import org.example.roomschedulerapi.classroomscheduler.model.Instructor;
 import org.example.roomschedulerapi.classroomscheduler.model.Role;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.AuthRequestDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.AuthResponseDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.RegisterRequestDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.ResetPasswordWithOtpRequestDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
 import org.example.roomschedulerapi.classroomscheduler.repository.AdminRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.DepartmentRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepository;
@@ -182,5 +179,41 @@ public class AuthServiceImpl implements AuthService {
 
         // 4. Clear the OTP so it can't be used again
         otpService.clearOtp(request.getEmail());
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(Authentication authentication, ChangePasswordRequest request) {
+        // 1. Get the authenticated user's email
+        String email = authentication.getName();
+
+        // 2. Find the user (check both Admin and Instructor)
+        UserDetails userDetails;
+
+        Optional<Admin> adminOptional = adminRepository.findByEmail(email);
+        if (adminOptional.isPresent()) {
+            userDetails = adminOptional.get();
+        } else {
+            userDetails = instructorRepository.findByEmail(email)
+                    .orElseThrow(() -> new NoSuchElementException("User not found"));
+        }
+
+        // 3. Verify current password matches
+        if (!passwordEncoder.matches(request.getCurrentPassword(), userDetails.getPassword())) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        // 4. Encode and update the new password
+        String encodedNewPassword = passwordEncoder.encode(request.getNewPassword());
+
+        if (userDetails instanceof Admin) {
+            Admin admin = (Admin) userDetails;
+            admin.setPassword(encodedNewPassword);
+            adminRepository.save(admin);
+        } else if (userDetails instanceof Instructor) {
+            Instructor instructor = (Instructor) userDetails;
+            instructor.setPassword(encodedNewPassword);
+            instructorRepository.save(instructor);
+        }
     }
 }

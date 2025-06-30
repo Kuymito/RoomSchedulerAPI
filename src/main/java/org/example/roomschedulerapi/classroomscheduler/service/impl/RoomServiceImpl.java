@@ -1,6 +1,7 @@
 package org.example.roomschedulerapi.classroomscheduler.service.impl;
 
 import org.example.roomschedulerapi.classroomscheduler.model.Room;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.RoomScheduleDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.RoomUpdateDto;
 import org.example.roomschedulerapi.classroomscheduler.repository.RoomRepository;
 import org.example.roomschedulerapi.classroomscheduler.service.RoomService;
@@ -10,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class RoomServiceImpl implements RoomService {
@@ -21,8 +23,12 @@ public class RoomServiceImpl implements RoomService {
     }
 
     @Override
-    public List<Room> getAllRooms() {
-        return roomRepository.findAll();
+    @Transactional(readOnly = true)
+    public List<RoomScheduleDto> getAllRooms() {
+        // --- UPDATE THIS METHOD'S LOGIC ---
+        return roomRepository.findAll().stream()
+                .map(this::mapToRoomScheduleDto) // Reuse the mapping logic
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -42,7 +48,6 @@ public class RoomServiceImpl implements RoomService {
         if (dto.getCapacity() != null) existingRoom.setCapacity(dto.getCapacity());
         if (dto.getType() != null) existingRoom.setType(dto.getType());
         if (dto.getEquipment() != null) existingRoom.setEquipment(dto.getEquipment());
-        if (dto.getIsAvailable() != null) existingRoom.setIsAvailable(dto.getIsAvailable());
 
         return roomRepository.save(existingRoom);
     }
@@ -54,5 +59,35 @@ public class RoomServiceImpl implements RoomService {
             throw new NoSuchElementException("Cannot delete. Room not found with id: " + roomId);
         }
         roomRepository.deleteById(roomId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<RoomScheduleDto> getRoomSchedule(Long roomId) {
+        return roomRepository.findById(roomId).map(this::mapToRoomScheduleDto);
+    }
+
+    private RoomScheduleDto mapToRoomScheduleDto(Room room) {
+        RoomScheduleDto dto = new RoomScheduleDto();
+        dto.setRoomId(room.getRoomId());
+        dto.setRoomName(room.getRoomName());
+        dto.setBuildingName(room.getBuildingName());
+        dto.setFloor(room.getFloor());
+        dto.setCapacity(room.getCapacity());
+        dto.setType(room.getType());
+        dto.setEquipment(room.getEquipment());
+
+        List<RoomScheduleDto.DailyAvailabilityDto> dailyDtos = room.getAvailability()
+                .stream()
+                .map(avail -> {
+                    RoomScheduleDto.DailyAvailabilityDto dailyDto = new RoomScheduleDto.DailyAvailabilityDto();
+                    dailyDto.setDayOfWeek(avail.getDayOfWeek());
+                    dailyDto.setAvailable(avail.getIsAvailable());
+                    return dailyDto;
+                })
+                .collect(Collectors.toList());
+
+        dto.setSchedule(dailyDtos);
+        return dto;
     }
 }

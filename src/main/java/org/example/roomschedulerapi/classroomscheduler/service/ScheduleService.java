@@ -13,4 +13,5 @@ public interface ScheduleService {
     ScheduleResponseDto assignRoomToClass(ScheduleRequestDto dto);
     List<ScheduleResponseDto> getAllSchedules();
     Optional<ScheduleResponseDto> getScheduleById(Long scheduleId);
+    List<ScheduleResponseDto> getSchedulesForInstructor(Long instructorId);
 }

@@ -1,8 +1,11 @@
 package org.example.roomschedulerapi.classroomscheduler.repository;
 
 import org.example.roomschedulerapi.classroomscheduler.model.Room;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
 
 @Repository
 public interface RoomRepository extends JpaRepository<Room, Long> { // Assuming Long is the type of roomId
@@ -16,4 +19,6 @@ public interface RoomRepository extends JpaRepository<Room, Long> { // Assuming 
 
     // You can add custom query methods here if needed, e.g.:
     // List<Room> findByBuildingName(String buildingName);
+    @EntityGraph(value = "Room.withAvailability")
+    List<Room> findAll();
 }

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.example.roomschedulerapi.classroomscheduler.model.Shift;
 
 @Data
 @AllArgsConstructor
@@ -13,17 +14,14 @@ public class ScheduleResponseDto {
     private Long classId;
     private String className;
     private String day;
+    private String year;       // Mapped from Class's generation
+    private String semester;
+    private ShiftResponseDto shift;
     private Long roomId;
     private String roomName;
     private String buildingName; // Added building for more context
 
-    public ScheduleResponseDto(Long scheduleId, Long classId, String className, Long roomId, String roomName, String buildingName, String day) {
-        this.scheduleId = scheduleId;
-        this.classId = classId;
-        this.className = className;
-        this.roomId = roomId;
-        this.roomName = roomName;
-        this.buildingName = buildingName;
-        this.day = day;
-    }
+
+
+
 }

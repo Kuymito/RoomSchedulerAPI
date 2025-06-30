@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.model.Class;
 import org.example.roomschedulerapi.classroomscheduler.model.Room;
 import org.example.roomschedulerapi.classroomscheduler.model.Schedule;
+import org.example.roomschedulerapi.classroomscheduler.model.Shift;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleRequestDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleResponseDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.ShiftResponseDto;
 import org.example.roomschedulerapi.classroomscheduler.repository.ClassRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.RoomRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.ScheduleRepository;
@@ -28,16 +30,31 @@ public class ScheduleServiceImpl implements ScheduleService {
 
 
     private ScheduleResponseDto convertToDto(Schedule schedule) {
+        Class aClass = schedule.getAClass();
+        Room room = schedule.getRoom();
+
+        // --- FIX: Manually map the Shift entity to a ShiftResponseDto ---
+        Shift shiftEntity = aClass.getShiftEntity();
+        ShiftResponseDto shiftDto = new ShiftResponseDto(
+                shiftEntity.getShiftId(), // Assuming shiftId is Long in entity
+                shiftEntity.getStartTime(),
+                shiftEntity.getEndTime()
+        );
+
         return new ScheduleResponseDto(
                 schedule.getScheduleId(),
-                schedule.getAClass().getClassId(),
-                schedule.getAClass().getClassName(),
-                schedule.getRoom().getRoomId(),
-                schedule.getRoom().getRoomName(),
-                schedule.getRoom().getBuildingName(),
-                String.valueOf(schedule.getAClass().getDay())
+                aClass.getClassId(),
+                aClass.getClassName(),
+                aClass.getDay(),
+                aClass.getYear(),
+                aClass.getSemester(),
+                shiftDto, // Use the newly created DTO
+                room.getRoomId(),
+                room.getRoomName(),
+                room.getBuildingName()
         );
     }
+
 
     @Override
     public List<ScheduleResponseDto> getAllSchedules() {
@@ -53,34 +70,31 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Transactional
     @Override
     public ScheduleResponseDto assignRoomToClass(ScheduleRequestDto dto) {
-        // 1. Check if the class is already assigned to a room
-        if (scheduleRepository.existsByaClass_ClassId(dto.getClassId())) {
-            throw new IllegalStateException("This class (ID: " + dto.getClassId() + ") is already assigned to a room.");
-        }
-
-        // 2. Fetch the related entities
+        // ... (existing logic to fetch entities) ...
         Class aClass = classRepository.findById(dto.getClassId())
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + dto.getClassId()));
 
         Room room = roomRepository.findById(dto.getRoomId())
                 .orElseThrow(() -> new NoSuchElementException("Room not found with id: " + dto.getRoomId()));
 
-        // 3. Create and save the new schedule entry
         Schedule newSchedule = new Schedule();
         newSchedule.setAClass(aClass);
         newSchedule.setRoom(room);
-
         Schedule savedSchedule = scheduleRepository.save(newSchedule);
 
-        // 4. Convert to DTO to return to the controller
-        return new ScheduleResponseDto(
-                savedSchedule.getScheduleId(),
-                savedSchedule.getAClass().getClassId(),
-                savedSchedule.getAClass().getClassName(),
-                savedSchedule.getRoom().getRoomId(),
-                savedSchedule.getRoom().getRoomName(),
-                savedSchedule.getRoom().getBuildingName(),
-                String.valueOf(savedSchedule.getAClass().getDay())
-        );
+        // This will now correctly call the updated convertToDto method
+        return convertToDto(savedSchedule);
+    }
+
+
+    @Override
+    public List<ScheduleResponseDto> getSchedulesForInstructor(Long instructorId) {
+        // Call the new repository method
+        List<Schedule> schedules = scheduleRepository.findByaClass_Instructor_InstructorId(instructorId);
+
+        // Reuse the existing DTO conversion logic
+        return schedules.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 }

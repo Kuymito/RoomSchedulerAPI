@@ -1,12 +1,14 @@
     package org.example.roomschedulerapi.classroomscheduler.controller; // Adjust package
 
     import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
+    import org.example.roomschedulerapi.classroomscheduler.model.dto.AssignInstructorDto;
     import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassCreateDto;
     import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassResponseDto;
     import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassUpdateDto;
     import org.example.roomschedulerapi.classroomscheduler.service.ClassService;
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
+    import org.springframework.security.core.Authentication;
     import org.springframework.web.bind.annotation.*;
 
     import java.time.LocalDateTime;
@@ -130,5 +132,20 @@
                         "Error deleting class: " + e.getMessage(), null, HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now()
                 ));
             }
+        }
+
+        @PutMapping("/assign-instructor")
+        public ResponseEntity<ClassResponseDto> assignInstructorToClass(@RequestBody AssignInstructorDto assignInstructorDto) {
+            return ResponseEntity.ok(classService.assignInstructor(assignInstructorDto));
+        }
+
+        @GetMapping("/my-classes")
+        public ResponseEntity<ApiResponse<List<ClassResponseDto>>> getMyAssignedClasses(Authentication authentication) {
+            // 'authentication.getName()' will return the email of the logged-in user (from the JWT)
+            String instructorEmail = authentication.getName();
+            List<ClassResponseDto> classes = classService.getClassesForAuthenticatedInstructor(instructorEmail);
+            return ResponseEntity.ok(new ApiResponse<>(
+                    "Assigned classes retrieved successfully", classes, HttpStatus.OK, LocalDateTime.now()
+            ));
         }
     }

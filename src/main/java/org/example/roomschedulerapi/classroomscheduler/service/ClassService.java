@@ -2,6 +2,7 @@ package org.example.roomschedulerapi.classroomscheduler.service; // Adjust packa
 
 // Removed: import org.example.roomschedulerapi.classroomscheduler.model.Class;
 
+import org.example.roomschedulerapi.classroomscheduler.model.dto.AssignInstructorDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassCreateDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassResponseDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassUpdateDto;
@@ -24,4 +25,8 @@ public interface ClassService {
     ClassResponseDto archiveClass(Long classId, boolean archiveStatus); // Changed return type
 
     void deleteClass(Long classId);
+
+    ClassResponseDto assignInstructor(AssignInstructorDto assignInstructorDto);
+
+    List<ClassResponseDto> getClassesForAuthenticatedInstructor(String instructorEmail);
 }

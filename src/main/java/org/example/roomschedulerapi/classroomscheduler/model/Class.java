@@ -61,8 +61,8 @@ public class Class {
     @Column(name = "is_free") // Defaults to false in DB
     private boolean isFree = false;
 
-    @Column(name = "is_archived", nullable = false) // nullable = false to match DB default behavior
-    private boolean is_archived = false;
+    @Column(name = "is_archived", nullable = false)
+    private boolean isArchived = false;
 
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
@@ -72,6 +72,9 @@ public class Class {
 
     @Column(name = "day")
     private String day;
+
+    @Column(name = "year")
+    private String year;
 
     // Removed 'updatedAt' as it was not in the provided CLASSES DDL.
     // If you add an 'updated_at' column to your DB, you can re-add this field and @PreUpdate.
@@ -186,11 +189,11 @@ public class Class {
     }
 
     public boolean isIs_archived() { // Kept as per your original naming
-        return is_archived;
+        return isArchived;
     }
 
-    public void setIs_archived(boolean is_archived) {
-        this.is_archived = is_archived;
+    public void setIs_archived(boolean isArchived) {
+        this.isArchived = isArchived;
     }
 
     public LocalDateTime getArchivedAt() {
@@ -224,6 +227,24 @@ public class Class {
     public void setDay(String day) {
         this.day = day;
     }
+
+    public boolean isArchived() {
+        return isArchived;
+    }
+
+    public void setArchived(boolean archived) {
+        isArchived = archived;
+    }
+
+    public String getYear() {
+        return year;
+    }
+
+    public void setYear(String year) {
+        this.year = year;
+    }
+
+
 
     @Override
     public boolean equals(Object o) {

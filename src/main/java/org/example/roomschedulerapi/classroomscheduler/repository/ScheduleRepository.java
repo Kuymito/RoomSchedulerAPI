@@ -49,4 +49,6 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     //  s.day = :date AND
     @Query("SELECT COUNT(DISTINCT s.room.roomId) FROM Schedule s WHERE s.aClass.shiftEntity.shiftId = :shiftId")
     long countDistinctRoomsUsedOnDateForShift(@Param("shiftId") Long shiftId);
+
+    List<Schedule> findByaClass_Instructor_InstructorId(Long instructorId);
 }

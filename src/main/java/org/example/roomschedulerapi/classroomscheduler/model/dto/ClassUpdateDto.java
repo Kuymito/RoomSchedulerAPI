@@ -25,6 +25,8 @@ public class ClassUpdateDto {
 
     private Boolean is_archived; // For PATCHing the archive status
 
+    private Boolean is_online;
+
     // Default constructor
     public ClassUpdateDto() {
     }

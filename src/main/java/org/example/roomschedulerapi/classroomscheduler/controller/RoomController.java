@@ -2,6 +2,7 @@ package org.example.roomschedulerapi.classroomscheduler.controller;
 
 import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
 import org.example.roomschedulerapi.classroomscheduler.model.Room;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.RoomScheduleDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.RoomUpdateDto;
 import org.example.roomschedulerapi.classroomscheduler.service.RoomService;
 import org.springframework.http.HttpStatus;
@@ -25,10 +26,15 @@ public class RoomController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Room>>> getAllRooms() {
-        List<Room> rooms = roomService.getAllRooms();
-        ApiResponse<List<Room>> response = new ApiResponse<>(
-                "Rooms retrieved successfully", rooms, HttpStatus.OK, LocalDateTime.now());
+    public ResponseEntity<ApiResponse<List<RoomScheduleDto>>> getAllRooms() {
+        // --- UPDATE THIS METHOD ---
+        List<RoomScheduleDto> roomSchedules = roomService.getAllRooms();
+        ApiResponse<List<RoomScheduleDto>> response = new ApiResponse<>(
+                "All rooms and their schedules retrieved successfully",
+                roomSchedules,
+                HttpStatus.OK,
+                LocalDateTime.now()
+        );
         return ResponseEntity.ok(response);
     }
 
@@ -36,6 +42,13 @@ public class RoomController {
     public ResponseEntity<ApiResponse<Room>> getRoomById(@PathVariable Long roomId) {
         return roomService.getRoomById(roomId)
                 .map(room -> ResponseEntity.ok(new ApiResponse<>("Room retrieved successfully", room, HttpStatus.OK, LocalDateTime.now())))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>("Room not found with id: " + roomId, null, HttpStatus.NOT_FOUND, LocalDateTime.now())));
+    }
+
+    @GetMapping("/{roomId}/schedule")
+    public ResponseEntity<ApiResponse<RoomScheduleDto>> getRoomSchedule(@PathVariable Long roomId) {
+        return roomService.getRoomSchedule(roomId)
+                .map(schedule -> ResponseEntity.ok(new ApiResponse<>("Room schedule retrieved successfully", schedule, HttpStatus.OK, LocalDateTime.now())))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>("Room not found with id: " + roomId, null, HttpStatus.NOT_FOUND, LocalDateTime.now())));
     }
 

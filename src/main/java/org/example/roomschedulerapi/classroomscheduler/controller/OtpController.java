@@ -69,7 +69,6 @@ public class OtpController {
 
         if (serverOtp.equals(validationRequest.getOtp())) {
             // OTP is valid, clear it to prevent reuse
-            otpService.clearOtp(validationRequest.getEmail());
             return ResponseEntity.ok(new ApiResponse<>(
                     "OTP validation successful.",
                     true, HttpStatus.OK, LocalDateTime.now()));

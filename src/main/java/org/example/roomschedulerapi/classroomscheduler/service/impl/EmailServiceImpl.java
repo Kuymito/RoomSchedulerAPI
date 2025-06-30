@@ -2,6 +2,7 @@ package org.example.roomschedulerapi.classroomscheduler.service.impl;
 
 import org.example.roomschedulerapi.classroomscheduler.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -12,14 +13,23 @@ public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender javaMailSender;
 
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
     @Autowired
     public EmailServiceImpl(JavaMailSender javaMailSender) {
         this.javaMailSender = javaMailSender;
     }
 
+    @Override
     public void sendOtpEmail(String toEmail, String otp) {
         try {
+            System.out.println("Attempting to send OTP email synchronously...");
             SimpleMailMessage message = new SimpleMailMessage();
+
+            // Set the 'From' address to match the authenticated user
+            message.setFrom(fromEmail);
+
             message.setTo(toEmail);
             message.setSubject("Your OTP Code for Verification");
             message.setText("Hello,\n\nYour One-Time Password (OTP) for verification is: " + otp +
@@ -27,18 +37,20 @@ public class EmailServiceImpl implements EmailService {
                     "\n\nThank you,\nThe Application Team");
 
             javaMailSender.send(message);
+            System.out.println("Email sending process completed.");
+
         } catch (Exception e) {
-            // Handle mail sending exceptions, e.g., log them
-            // In a real application, you might want to throw a custom exception
-            System.err.println("Error sending OTP email: " + e.getMessage());
-            // For now, we'll let it fail silently in the background, but production code should handle this better.
+            System.err.println("Error caught in EmailServiceImpl. Re-throwing...");
+            throw new RuntimeException("Failed to send OTP email: " + e.getMessage(), e);
         }
     }
 
-    @Async // Runs this task in a background thread
+    @Override
+    @Async
     public void sendPasswordResetEmail(String toEmail, String resetLink) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail); // Also add the fix here for consistency
             message.setTo(toEmail);
             message.setSubject("Password Reset Request");
             message.setText(
@@ -51,7 +63,7 @@ public class EmailServiceImpl implements EmailService {
             );
             javaMailSender.send(message);
         } catch (Exception e) {
-            System.err.println("Error sending password reset email: " + e.getMessage());
+            throw new RuntimeException("Failed to send password reset email: " + e.getMessage(), e);
         }
     }
 }

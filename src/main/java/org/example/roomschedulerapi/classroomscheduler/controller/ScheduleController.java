@@ -3,11 +3,14 @@ package org.example.roomschedulerapi.classroomscheduler.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
+import org.example.roomschedulerapi.classroomscheduler.model.Instructor;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleRequestDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleResponseDto;
 import org.example.roomschedulerapi.classroomscheduler.service.ScheduleService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -61,5 +64,23 @@ public class ScheduleController {
         }
     }
 
+    @GetMapping("/my-schedule")
+    public ResponseEntity<ApiResponse<List<ScheduleResponseDto>>> getMySchedules(
+            // FIX 1: Change the parameter type from 'User' to 'Instructor'
+            @AuthenticationPrincipal Instructor instructor) {
+
+        // FIX 2: Call the correct getter method
+        Long instructorId = instructor.getInstructorId();
+
+        List<ScheduleResponseDto> schedules = scheduleService.getSchedulesForInstructor(instructorId);
+
+        ApiResponse<List<ScheduleResponseDto>> response = new ApiResponse<>(
+                "Schedules for the current instructor retrieved successfully",
+                schedules,
+                HttpStatus.OK,
+                LocalDateTime.now()
+        );
+        return ResponseEntity.ok(response);
+    }
 
 }

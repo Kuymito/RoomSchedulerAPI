@@ -4,6 +4,8 @@ import org.example.roomschedulerapi.classroomscheduler.model.Class;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
+
 public interface ClassRepository extends JpaRepository<Class, Long> {
     /**
      * Counts the number of classes based on their 'is_online' status.
@@ -19,4 +21,6 @@ public interface ClassRepository extends JpaRepository<Class, Long> {
      */
     @Query("SELECT count(c) FROM Class c WHERE c.classId NOT IN (SELECT s.aClass.classId FROM Schedule s)")
     long countUnassignedClasses();
+
+    List<Class> findByInstructor_InstructorIdAndIsArchivedFalse(Long instructorId);
 }

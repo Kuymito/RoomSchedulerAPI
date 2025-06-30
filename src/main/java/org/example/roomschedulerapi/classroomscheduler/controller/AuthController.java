@@ -117,6 +117,36 @@ public class AuthController {
                     "Error resetting password: " + e.getMessage(), null, HttpStatus.BAD_REQUEST, LocalDateTime.now()));
         }
     }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<String>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication
+    ) {
+        try {
+            authService.changePassword(authentication, request);
+            return ResponseEntity.ok(new ApiResponse<>(
+                    "Password changed successfully",
+                    null,
+                    HttpStatus.OK,
+                    LocalDateTime.now()
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(
+                    e.getMessage(),
+                    null,
+                    HttpStatus.BAD_REQUEST,
+                    LocalDateTime.now()
+            ));
+        } catch (NoSuchElementException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>(
+                    "User not found",
+                    null,
+                    HttpStatus.NOT_FOUND,
+                    LocalDateTime.now()
+            ));
+        }
+    }
 }
 
 // Create these DTOs: AuthRequestDto.java and AuthResponseDto.java

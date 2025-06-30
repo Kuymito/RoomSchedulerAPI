@@ -1,5 +1,6 @@
 package org.example.roomschedulerapi.classroomscheduler.model.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -23,6 +24,12 @@ public class ShiftResponseDto {
     }
 
     public ShiftResponseDto(){}
+
+    public ShiftResponseDto(Long shiftId, LocalTime startTime, LocalTime endTime) {
+        this.shiftId = shiftId;
+        this.startTime = startTime;
+        this.endTime = endTime;
+    }
 
     public Long getShiftId() {
         return shiftId;

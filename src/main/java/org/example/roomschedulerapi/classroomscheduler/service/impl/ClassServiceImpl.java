@@ -239,4 +239,30 @@ public class ClassServiceImpl implements ClassService {
         }
         classRepository.deleteById(classId);
     }
+
+
+    @Transactional
+    @Override
+    public ClassResponseDto assignInstructor(AssignInstructorDto assignInstructorDto) {
+        Class existingClass = classRepository.findById(assignInstructorDto.getClassId())
+                .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + assignInstructorDto.getClassId()));
+
+        Instructor instructor = instructorRepository.findById(assignInstructorDto.getInstructorId())
+                .orElseThrow(() -> new NoSuchElementException("Instructor not found with id: " + assignInstructorDto.getInstructorId()));
+
+        existingClass.setInstructor(instructor);
+        Class updatedClass = classRepository.save(existingClass);
+        return convertToDto(updatedClass);
+    }
+
+    @Override
+    public List<ClassResponseDto> getClassesForAuthenticatedInstructor(String instructorEmail) {
+        Instructor instructor = instructorRepository.findByEmail(instructorEmail)
+                .orElseThrow(() -> new NoSuchElementException("Instructor not found: " + instructorEmail));
+
+        // ✅ USES THE CORRECT REPOSITORY METHOD
+        List<Class> classes = classRepository.findByInstructor_InstructorIdAndIsArchivedFalse(instructor.getInstructorId());
+
+        return classes.stream().map(this::convertToDto).collect(Collectors.toList());
+    }
 }
