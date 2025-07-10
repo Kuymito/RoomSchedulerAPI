@@ -1,10 +1,8 @@
     package org.example.roomschedulerapi.classroomscheduler.controller; // Adjust package
 
+    import jakarta.validation.Valid;
     import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
-    import org.example.roomschedulerapi.classroomscheduler.model.dto.AssignInstructorDto;
-    import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassCreateDto;
-    import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassResponseDto;
-    import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassUpdateDto;
+    import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
     import org.example.roomschedulerapi.classroomscheduler.service.ClassService;
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
@@ -134,9 +132,25 @@
             }
         }
 
-        @PutMapping("/assign-instructor")
-        public ResponseEntity<ClassResponseDto> assignInstructorToClass(@RequestBody AssignInstructorDto assignInstructorDto) {
-            return ResponseEntity.ok(classService.assignInstructor(assignInstructorDto));
+        @PostMapping("/assign-instructor")
+        public ResponseEntity<ClassResponseDto> assignInstructor(@RequestBody AssignInstructorDto assignInstructorDto) {
+            ClassResponseDto updatedClass = classService.assignInstructor(assignInstructorDto);
+            return ResponseEntity.ok(updatedClass);
+        }
+
+        @PostMapping("/unassign-instructor")
+        public ResponseEntity<ApiResponse<ClassResponseDto>> unassignInstructor(
+                @Valid @RequestBody UnassignInstructorDto unassignDto) {
+
+            ClassResponseDto updatedClass = classService.unassignInstructor(unassignDto);
+
+            ApiResponse<ClassResponseDto> response = new ApiResponse<>(
+                    "Instructor unassigned successfully from " + unassignDto.getDayOfWeek(),
+                    updatedClass,
+                    HttpStatus.OK,
+                    LocalDateTime.now()
+            );
+            return ResponseEntity.ok(response);
         }
 
         @GetMapping("/my-classes")

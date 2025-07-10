@@ -56,6 +56,7 @@ public class JwtUtil {
             Instructor instructor = (Instructor) userDetails;
             extraClaims.put("firstName", instructor.getFirstName());
             extraClaims.put("lastName", instructor.getLastName());
+            extraClaims.put("instructorId", instructor.getInstructorId());
         } else if (userDetails instanceof Admin) {
             Admin admin = (Admin) userDetails;
             // Assuming your Admin entity has a 'fullName' field

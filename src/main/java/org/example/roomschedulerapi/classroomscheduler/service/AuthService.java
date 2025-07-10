@@ -11,4 +11,5 @@ public interface AuthService {
     void resetPassword(String token, String newPassword);
     void resetPasswordWithOtp(ResetPasswordWithOtpRequestDto request);
     void changePassword(Authentication authentication, ChangePasswordRequest request);
+
 }

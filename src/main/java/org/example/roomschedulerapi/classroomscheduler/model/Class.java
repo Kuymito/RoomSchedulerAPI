@@ -4,15 +4,10 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 
-
-
-
-// TODO: Consider renaming this entity from "Class" to avoid conflicts with java.lang.Class.
-// For example: Course, ScheduledClass, Clazz, etc.
 @Entity
 @Table(name = "classes") // Matches the PostgreSQL table name
 @AllArgsConstructor
@@ -20,86 +15,61 @@ public class Class {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "class_id") // Mapped to class_id in the database
-    private Long classId; // Java field name can remain courseId or change to classId
+    @Column(name = "class_id")
+    private Long classId;
 
-    @Column(name = "name", nullable = false, length = 255) // Mapped to name in the database
+    @Column(name = "name", nullable = false, length = 255)
     private String className;
 
-    // 'instructor_id' - Mapped via @ManyToOne Instructor instructor
-    @ManyToOne(fetch = FetchType.LAZY) // LAZY is often a good default
-    @JoinColumn(name = "instructor_id")
-    private Instructor instructor;
+    @OneToMany(mappedBy = "aClass", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ClassInstructor> classInstructors;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
 
-    // 'shift_id' - Mapped via @ManyToOne Shift shiftEntity
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "shift_id", nullable = false)
-    private Shift shiftEntity; // Renamed to avoid potential conflict if 'shift' string was needed
-
     @Column(name = "generation", length = 50)
     private String generation;
 
-    @Column(name = "\"group\"", length = 50) // DB column "group" (quoted as it's a keyword)
-    private String groupName; // Java field name
+    @Column(name = "\"group\"", length = 50) // Escaped "group" as it is a reserved keyword
+    private String groupName;
 
-    @Column(name = "major", length = 100) // Mapped to major in the database
+    @Column(name = "major", length = 100)
     private String majorName;
 
-    @Column(name = "degree", length = 100) // Mapped to degree in the database
+    @Column(name = "degree", length = 100)
     private String degreeName;
 
-    @Column(name = "semester", length = 100)
-    private String semester;
+    @Column(name = "is_online", columnDefinition = "boolean default false")
+    private boolean isOnline;
 
-    @Column(name = "is_online") // Defaults to false in DB
-    private boolean isOnline = false;
+    @Column(name = "is_free", columnDefinition = "boolean default false")
+    private boolean isFree;
 
-    @Column(name = "is_free") // Defaults to false in DB
-    private boolean isFree = false;
-
-    @Column(name = "is_archived", nullable = false)
-    private boolean isArchived = false;
+    @Column(name = "is_archived", columnDefinition = "boolean default false")
+    private boolean isArchived;
 
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
 
-    @Column(name = "created_at", updatable = false, nullable = false)
+    @Column(name = "created_at", columnDefinition = "timestamp with time zone default CURRENT_TIMESTAMP")
     private LocalDateTime createdAt;
 
-    @Column(name = "day")
-    private String day;
+    @Column(name = "semester", length = 100)
+    private String semester;
 
     @Column(name = "year")
-    private String year;
+    private Integer year;
 
-    // Removed 'updatedAt' as it was not in the provided CLASSES DDL.
-    // If you add an 'updated_at' column to your DB, you can re-add this field and @PreUpdate.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shift_id", nullable = false)
+    private Shift shift;
 
-    // JPA life cycle callback for createdAt timestamp
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        // If you had an updatedAt field for persistence:
-        // updatedAt = LocalDateTime.now();
-    }
 
-    // Removed @PreUpdate as 'updatedAt' field was removed.
-    // If 'updatedAt' is re-added and persisted:
-    // @PreUpdate
-    // protected void onUpdate() {
-    //     updatedAt = LocalDateTime.now();
-    // }
-
-    // Constructors
     public Class() {
     }
 
     // Getters and Setters
-
     public Long getClassId() {
         return classId;
     }
@@ -116,12 +86,12 @@ public class Class {
         this.className = className;
     }
 
-    public Instructor getInstructor() {
-        return instructor;
+    public List<ClassInstructor> getClassInstructors() {
+        return classInstructors;
     }
 
-    public void setInstructor(Instructor instructor) {
-        this.instructor = instructor;
+    public void setClassInstructors(List<ClassInstructor> classInstructors) {
+        this.classInstructors = classInstructors;
     }
 
     public Department getDepartment() {
@@ -130,14 +100,6 @@ public class Class {
 
     public void setDepartment(Department department) {
         this.department = department;
-    }
-
-    public Shift getShiftEntity() {
-        return shiftEntity;
-    }
-
-    public void setShiftEntity(Shift shiftEntity) {
-        this.shiftEntity = shiftEntity;
     }
 
     public String getGeneration() {
@@ -188,12 +150,12 @@ public class Class {
         isFree = free;
     }
 
-    public boolean isIs_archived() { // Kept as per your original naming
+    public boolean isArchived() {
         return isArchived;
     }
 
-    public void setIs_archived(boolean isArchived) {
-        this.isArchived = isArchived;
+    public void setArchived(boolean archived) {
+        isArchived = archived;
     }
 
     public LocalDateTime getArchivedAt() {
@@ -220,31 +182,21 @@ public class Class {
         this.semester = semester;
     }
 
-    public String getDay() {
-        return day;
-    }
-
-    public void setDay(String day) {
-        this.day = day;
-    }
-
-    public boolean isArchived() {
-        return isArchived;
-    }
-
-    public void setArchived(boolean archived) {
-        isArchived = archived;
-    }
-
-    public String getYear() {
+    public Integer getYear() {
         return year;
     }
 
-    public void setYear(String year) {
+    public void setYear(Integer year) {
         this.year = year;
     }
 
+    public Shift getShift() {
+        return shift;
+    }
 
+    public void setShift(Shift shift) {
+        this.shift = shift;
+    }
 
     @Override
     public boolean equals(Object o) {
@@ -257,16 +209,5 @@ public class Class {
     @Override
     public int hashCode() {
         return Objects.hash(classId);
-    }
-
-    // toString() method can be useful for debugging
-    @Override
-    public String toString() {
-        return "Class{" +
-                "courseId=" + classId +
-                ", courseName='" + className + '\'' +
-                ", generation='" + generation + '\'' +
-                // Add other fields as needed, be careful with LAZY loaded entities
-                '}';
     }
 }

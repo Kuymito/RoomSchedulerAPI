@@ -13,7 +13,6 @@ public class RoomScheduleDto {
     private Integer capacity;
     private String type;
     private String equipment;
-    private List<DailyAvailabilityDto> schedule;
 
     @Data
     public static class DailyAvailabilityDto {

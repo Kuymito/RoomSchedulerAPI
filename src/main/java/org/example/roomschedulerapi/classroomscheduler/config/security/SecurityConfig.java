@@ -59,22 +59,45 @@ public class SecurityConfig {
                         ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.PATCH,
-                                "/api/v1/instructor/**", "/api/v1/class/**", "/api/v1/room/**"
+                                 "/api/v1/class/**", "/api/v1/room/**"
                         ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.DELETE,
                                 "/api/v1/instructor/**", "/api/v1/class/**", "/api/v1/room/**"
                         ).hasRole("ADMIN")
 
+                        .requestMatchers(HttpMethod.POST, "/api/v1/change-requests/*/approve").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/change-requests/*/deny").hasRole("ADMIN")
+
+                        // Rule for creating change requests
+                        .requestMatchers(HttpMethod.POST, "/api/v1/change-requests").hasAnyRole("ADMIN", "INSTRUCTOR")
+
+                        // Rule for fetching all requests (for Admin dashboard)
+                        .requestMatchers(HttpMethod.GET, "/api/v1/change-requests").hasRole("ADMIN")
+
+                        // Rule for notifications
+                        .requestMatchers("/api/v1/notifications/**").hasAnyRole("ADMIN", "INSTRUCTOR")
+
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/instructor/**").hasAnyRole("ADMIN", "INSTRUCTOR")
+
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/schedule/**").hasRole("ADMIN")
+
+
+
                         // 3. General Read Permissions for any authenticated user (Admin or Instructor)
-                        .requestMatchers(HttpMethod.GET, "/api/v1/instructor/**", "/api/v1/room/**", "/api/v1/class/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/instructor/**", "/api/v1/room/**", "/api/v1/class/**", "/api/v1/department/**").authenticated()
 
                         // 4. Fallback Rule: Any other request must be authenticated
                         .anyRequest().authenticated()
+
+
                 )
 
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
+                // Ensure your custom JWT filter runs before the standard Spring Security filters
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
 
         return http.build();
     }

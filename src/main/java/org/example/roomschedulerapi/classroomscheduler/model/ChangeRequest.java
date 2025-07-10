@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
+import org.springframework.cglib.core.Local;
+
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -26,11 +30,20 @@ public class ChangeRequest {
     @JoinColumn(name = "class_id", nullable = false)
     private Class aClass;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "room_id")
+    private Room room;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shift_id")
+    private Shift shift;
+
     @Column(name = "description", nullable = false, columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "is_approved")
-    private Boolean isApproved;
+    @Enumerated(EnumType.STRING) // This stores the status as a clean string ("PENDING", "APPROVED") in the DB
+    @Column(name = "status") // It's best practice to rename the column from is_approved to status
+    private RequestStatus status;
 
     @Column(name = "requested_at")
     private OffsetDateTime requestedAt;
@@ -40,4 +53,32 @@ public class ChangeRequest {
 
     @Column(name = "expired")
     private boolean expired = false;
+
+    @Column(name = "day_of_change")
+    private LocalDateTime dayOfChange;
+
+    // Add these setter methods
+    public void setRoom(Room room) {
+        this.room = room;
+    }
+
+    public void setShift(Shift shift) {
+        this.shift = shift;
+    }
+
+    public RequestStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(RequestStatus status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getDayOfChange() {
+        return dayOfChange;
+    }
+
+    public void setDayOfChange(LocalDateTime dayOfChange) {
+        this.dayOfChange = dayOfChange;
+    }
 }

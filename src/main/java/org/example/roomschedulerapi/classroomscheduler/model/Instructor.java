@@ -62,6 +62,7 @@ public class Instructor implements UserDetails {
     @Column(name = "is_archived", nullable = false)
     private boolean isArchived = false;
 
+
     // Optional: If an instructor can teach many classes and you want to navigate this way
     // @OneToMany(mappedBy = "instructor", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     // private Set<Class> classesTaught;

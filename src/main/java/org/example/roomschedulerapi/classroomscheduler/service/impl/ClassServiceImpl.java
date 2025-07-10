@@ -1,20 +1,20 @@
-package org.example.roomschedulerapi.classroomscheduler.service.impl; // Adjust package
+package org.example.roomschedulerapi.classroomscheduler.service.impl;
 
-import org.example.roomschedulerapi.classroomscheduler.model.Class;
-import org.example.roomschedulerapi.classroomscheduler.model.Department;
-import org.example.roomschedulerapi.classroomscheduler.model.Instructor;
-import org.example.roomschedulerapi.classroomscheduler.model.Shift;
+import org.example.roomschedulerapi.classroomscheduler.exception.InstructorConflictException; // Import the custom exception
+import org.example.roomschedulerapi.classroomscheduler.model.*;
+import org.example.roomschedulerapi.classroomscheduler.model.Class; // Explicit import
 import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
-import org.example.roomschedulerapi.classroomscheduler.repository.ClassRepository;
-import org.example.roomschedulerapi.classroomscheduler.repository.DepartmentRepository;
-import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepository;
-import org.example.roomschedulerapi.classroomscheduler.repository.ShiftRepository;
+import org.example.roomschedulerapi.classroomscheduler.repository.*;
 import org.example.roomschedulerapi.classroomscheduler.service.ClassService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -23,104 +23,82 @@ import java.util.stream.Collectors;
 public class ClassServiceImpl implements ClassService {
 
     private final ClassRepository classRepository;
-    // Assuming you'll need these repositories to fetch related entities for create/update
     private final InstructorRepository instructorRepository;
     private final DepartmentRepository departmentRepository;
     private final ShiftRepository shiftRepository;
+    private final ClassInstructorRepository classInstructorRepository;
 
     @Autowired
-    public ClassServiceImpl(ClassRepository classRepository,
-                            InstructorRepository instructorRepository,
-                            DepartmentRepository departmentRepository,
-                            ShiftRepository shiftRepository) {
+    public ClassServiceImpl(ClassRepository classRepository, InstructorRepository instructorRepository, DepartmentRepository departmentRepository, ShiftRepository shiftRepository, ClassInstructorRepository classInstructorRepository) {
         this.classRepository = classRepository;
         this.instructorRepository = instructorRepository;
         this.departmentRepository = departmentRepository;
         this.shiftRepository = shiftRepository;
+        this.classInstructorRepository = classInstructorRepository;
     }
 
-    // Helper method to convert Class entity to ClassResponseDto
+    /**
+     * Converts a Class entity to a ClassResponseDto.
+     *
+     * @param aClass The Class entity.
+     * @return The corresponding DTO.
+     */
     private ClassResponseDto convertToDto(Class aClass) {
         if (aClass == null) {
             return null;
         }
 
-        InstructorResponseDto instructorDto = null;
-        if (aClass.getInstructor() != null) {
-            Instructor instructor = aClass.getInstructor();
-            // Assuming Role and Department on Instructor are eagerly fetched or handled by their own DTO conversion
-            // For simplicity, creating a new InstructorResponseDto directly here.
-            // You might have a dedicated service/mapper for Instructor to InstructorResponseDto conversion.
-            String roleName = (instructor.getRole() != null) ? instructor.getRole().getRoleName() : null;
-            String deptName = (instructor.getDepartment() != null) ? instructor.getDepartment().getName() : null;
-            instructorDto =new InstructorResponseDto(
-                    instructor.getInstructorId(),
-                    instructor.getFirstName(),
-                    instructor.getLastName(),
-                    instructor.getEmail(),
-                    instructor.getPhone(),
-                    instructor.getDegree(),
-                    instructor.getMajor(),
-                    instructor.getProfile(),
-                    instructor.getAddress(),
-                    instructor.isArchived(),
-                    roleName,
-                    deptName
-            );
+        if (aClass.getClassInstructors() == null) {
+            aClass.setClassInstructors(new java.util.ArrayList<>());
         }
 
-        DepartmentResponseDto departmentDto = null;
-        if (aClass.getDepartment() != null) {
-            Department department = aClass.getDepartment();
-            departmentDto = new DepartmentResponseDto(department.getDepartmentId(), department.getName());
-        }
+        Map<String, ClassDayDetailsDto> dailyScheduleMap = aClass.getClassInstructors().stream()
+                .collect(Collectors.toMap(
+                        ci -> ci.getDayOfWeek().name(),
+                        ci -> {
+                            Instructor instructor = ci.getInstructor();
+                            String roleName = (instructor.getRole() != null) ? instructor.getRole().getRoleName() : null;
 
-        ShiftResponseDto shiftDto = null;
-        if (aClass.getShiftEntity() != null) { // Assuming getShiftEntity() is the getter for Shift
-            Shift shift = aClass.getShiftEntity();
-            shiftDto = new ShiftResponseDto(
-                    shift.getShiftId(),
-                    shift.getName(),
-                    shift.getStartTime(),
-                    shift.getEndTime(),
-                    shift.getScheduleType()
-            );
-        }
+                            // Safely get department details
+                            Long deptId = (instructor.getDepartment() != null) ? instructor.getDepartment().getDepartmentId() : null;
+                            String deptName = (instructor.getDepartment() != null) ? instructor.getDepartment().getName() : null;
 
-        return new ClassResponseDto(
-                aClass.getClassId(),       // ID from Class entity (was courseId)
-                aClass.getClassName(),   // Name from Class entity (was courseName)
-                aClass.getGeneration(),
-                aClass.getGroupName(),
-                aClass.getMajorName(),    // Assuming these fields exist on your Class entity
-                aClass.getDegreeName(),   // Assuming these fields exist on your Class entity
-                aClass.getSemester(),
-                aClass.isOnline(),
-                aClass.isFree(),
-                aClass.isIs_archived(),    // Getter for is_archived
-                aClass.getCreatedAt(),
-                aClass.getArchivedAt(),
-                instructorDto,
-                departmentDto,
-                shiftDto,
-                aClass.getDay()
-        );
+                            InstructorResponseDto instructorDto = new InstructorResponseDto(
+                                    instructor.getInstructorId(),
+                                    instructor.getFirstName(),
+                                    instructor.getLastName(),
+                                    instructor.getEmail(),
+                                    instructor.getPhone(),
+                                    instructor.getDegree(),
+                                    instructor.getMajor(),
+                                    instructor.getProfile(),
+                                    instructor.getAddress(),
+                                    instructor.isArchived(),
+                                    roleName,
+                                    deptId, // Correctly pass the department ID
+                                    deptName // Correctly pass the department name
+                            );
+
+                            return new ClassDayDetailsDto(ci.isOnline(), instructorDto);
+                        },
+                        (existing, replacement) -> existing // Added a merge function for safety
+                ));
+
+        // Create DTOs for related entities
+        DepartmentResponseDto departmentDto = (aClass.getDepartment() != null) ?
+                new DepartmentResponseDto(aClass.getDepartment().getDepartmentId(), aClass.getDepartment().getName()) : null;
+        ShiftResponseDto shiftDto = (aClass.getShift() != null) ?
+                new ShiftResponseDto(aClass.getShift().getShiftId(), aClass.getShift().getStartTime(), aClass.getShift().getEndTime()) : null;
+
+
+        return new ClassResponseDto(aClass.getClassId(), aClass.getClassName(), aClass.getGeneration(), aClass.getGroupName(), aClass.getMajorName(),
+                aClass.getDegreeName(), aClass.getSemester(), aClass.isOnline(), aClass.isFree(), aClass.isArchived(),
+                aClass.getCreatedAt(), aClass.getArchivedAt(), dailyScheduleMap, departmentDto, shiftDto);
     }
-
 
     @Override
     public List<ClassResponseDto> getAllClasses(Boolean isArchived) {
-        List<Class> classes;
-        if (isArchived == null) {
-            classes = classRepository.findAll();
-        } else {
-            // You need a method like findByIs_archived in ClassRepository
-            // classes = classRepository.findByIs_archived(isArchived);
-            // For now, filtering in memory (less efficient for large datasets):
-            List<Class> all = classRepository.findAll();
-            classes = all.stream().filter(c -> c.isIs_archived() == isArchived).collect(Collectors.toList());
-            // TODO: Implement proper repository method like: List<Class> findByIs_archived(boolean isArchived);
-        }
+        List<Class> classes = isArchived == null ? classRepository.findAll() : classRepository.findByIsArchived(isArchived);
         return classes.stream().map(this::convertToDto).collect(Collectors.toList());
     }
 
@@ -132,43 +110,40 @@ public class ClassServiceImpl implements ClassService {
     @Override
     @Transactional
     public ClassResponseDto createClass(ClassCreateDto dto) {
+        // --- DUPLICATE CHECK ---
+        // Check if a class with the same generation, group name, and major already exists.
+        Optional<Class> existingClass = classRepository.findByGenerationAndGroupNameAndMajorName(
+                dto.getGeneration(),
+                dto.getGroupName(),
+                dto.getMajor()
+        );
+
+        if (existingClass.isPresent()) {
+            throw new DataIntegrityViolationException(
+                    "A class with the same generation (" + dto.getGeneration() +
+                            "), group (" + dto.getGroupName() +
+                            "), and major (" + dto.getMajor() + ") already exists."
+            );
+        }
+        // --- END OF DUPLICATE CHECK ---
+
+        Department department = departmentRepository.findById(dto.getDepartmentId())
+                .orElseThrow(() -> new NoSuchElementException("Department not found with id: " + dto.getDepartmentId()));
+        Shift shift = shiftRepository.findById(dto.getShiftId())
+                .orElseThrow(() -> new NoSuchElementException("Shift not found with id: " + dto.getShiftId()));
+
         Class aClass = new Class();
-        aClass.setClassName(dto.getClassName()); // Entity setter vs DTO getter
-
-        // TODO: ALIGNMENT NEEDED!
-        // The Class entity you aligned with DB does NOT have setCredits, setFacultyName, setSemester.
-        // It also expects a Shift object for setShiftEntity, not a String.
-        // You need to resolve these discrepancies.
-        // For example, for shift, you'd get shiftId from DTO, fetch Shift entity, then set it.
-
-        // Assuming 'credits', 'facultyName', 'semester', 'shift' (as String) are still in your DTO
-        // but may not map directly to your current Class entity.
-        // Example for 'shift' if DTO had shiftId:
-        // if (dto.getShiftId() != null) { // Assuming ClassCreateDto gets a shiftId
-        //     Shift shift = shiftRepository.findById(dto.getShiftId())
-        //         .orElseThrow(() -> new NoSuchElementException("Shift not found with id: " + dto.getShiftId()));
-        //     aClass.setShiftEntity(shift);
-        // }
-        // Similar logic for instructorId and departmentId if they are in ClassCreateDto
-
+        aClass.setClassName(dto.getClassName());
         aClass.setGeneration(dto.getGeneration());
         aClass.setGroupName(dto.getGroupName());
-        // These were in your original DTO mapping but might not be in the refined Class entity
-        // aClass.setMajorName(dto.getMajorName());
-        // aClass.setDegreeName(dto.getDegreeName());
+        aClass.setMajorName(dto.getMajor());
+        aClass.setDegreeName(dto.getDegree());
+        aClass.setSemester(dto.getSemester());
+        aClass.setYear(dto.getYear());
+        aClass.setDepartment(department);
+        aClass.setShift(shift);
+        aClass.setArchived(false);
 
-        // Ensure your Class entity has these setters if these fields are from DTO
-        // If they are FKs like instructorId, departmentId, shiftId, fetch entities and set them.
-        // Example:
-        // If ClassCreateDto has Long instructorId:
-        // Instructor instructor = instructorRepository.findById(dto.getInstructorId()).orElse(null);
-        // aClass.setInstructor(instructor);
-
-        // Department instructor = departmentRepository.findById(dto.getDepartmentId()).orElse(null);
-        // aClass.setDepartment(department);
-
-
-        aClass.setIs_archived(false);
         Class savedClass = classRepository.save(aClass);
         return convertToDto(savedClass);
     }
@@ -179,15 +154,20 @@ public class ClassServiceImpl implements ClassService {
         Class existingClass = classRepository.findById(classId)
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + classId));
 
+        Department department = departmentRepository.findById(dto.getDepartmentId())
+                .orElseThrow(() -> new NoSuchElementException("Department not found with id: " + dto.getDepartmentId()));
+        Shift shift = shiftRepository.findById(dto.getShiftId())
+                .orElseThrow(() -> new NoSuchElementException("Shift not found with id: " + dto.getShiftId()));
+
         existingClass.setClassName(dto.getClassName());
-
-        // TODO: ALIGNMENT NEEDED (Same as createClass)
-        // Update mapping for credits, facultyName, semester, shift, etc.
-        // based on your actual Class entity structure and DTO fields.
-
-        if (dto.getGeneration() != null) existingClass.setGeneration(dto.getGeneration());
-        if (dto.getGroupName() != null) existingClass.setGroupName(dto.getGroupName());
-        // ... map other fields from ClassCreateDto to existingClass ...
+        existingClass.setGeneration(dto.getGeneration());
+        existingClass.setGroupName(dto.getGroupName());
+        existingClass.setMajorName(dto.getMajor());
+        existingClass.setDegreeName(dto.getDegree());
+        existingClass.setSemester(dto.getSemester());
+        existingClass.setYear(dto.getYear());
+        existingClass.setDepartment(department);
+        existingClass.setShift(shift);
 
         Class updatedClass = classRepository.save(existingClass);
         return convertToDto(updatedClass);
@@ -200,16 +180,22 @@ public class ClassServiceImpl implements ClassService {
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + classId));
 
         if (dto.getClassName() != null) aClass.setClassName(dto.getClassName());
-
-        // TODO: ALIGNMENT NEEDED (Same as createClass)
-        // Update mapping for credits, facultyName, semester, shift, etc.
-        // based on your actual Class entity structure and DTO fields.
-
         if (dto.getGeneration() != null) aClass.setGeneration(dto.getGeneration());
         if (dto.getGroupName() != null) aClass.setGroupName(dto.getGroupName());
-        // ... map other fields from ClassUpdateDto ...
+        if (dto.getMajor() != null) aClass.setMajorName(dto.getMajor());
+        if (dto.getDegree() != null) aClass.setDegreeName(dto.getDegree());
+        if (dto.getSemester() != null) aClass.setSemester(dto.getSemester());
+        if (dto.getYear() != null) aClass.setYear(dto.getYear());
+        if (dto.getIsArchived() != null) aClass.setArchived(dto.getIsArchived());
 
-        if (dto.getIs_archived() != null) aClass.setIs_archived(dto.getIs_archived());
+        if (dto.getDepartmentId() != null) {
+            Department department = departmentRepository.findById(dto.getDepartmentId()).orElseThrow(() -> new NoSuchElementException("Department not found"));
+            aClass.setDepartment(department);
+        }
+        if (dto.getShiftId() != null) {
+            Shift shift = shiftRepository.findById(dto.getShiftId()).orElseThrow(() -> new NoSuchElementException("Shift not found"));
+            aClass.setShift(shift);
+        }
 
         Class patchedClass = classRepository.save(aClass);
         return convertToDto(patchedClass);
@@ -220,13 +206,8 @@ public class ClassServiceImpl implements ClassService {
     public ClassResponseDto archiveClass(Long classId, boolean archiveStatus) {
         Class aClass = classRepository.findById(classId)
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + classId));
-        aClass.setIs_archived(archiveStatus);
-        // Potentially set/clear archivedAt timestamp here
-        if (archiveStatus && aClass.getArchivedAt() == null) {
-            // aClass.setArchivedAt(LocalDateTime.now()); // Assuming archivedAt setter exists
-        } else if (!archiveStatus) {
-            // aClass.setArchivedAt(null);
-        }
+        aClass.setArchived(archiveStatus);
+        aClass.setArchivedAt(archiveStatus ? LocalDateTime.now() : null);
         Class savedClass = classRepository.save(aClass);
         return convertToDto(savedClass);
     }
@@ -240,28 +221,111 @@ public class ClassServiceImpl implements ClassService {
         classRepository.deleteById(classId);
     }
 
-
     @Transactional
     @Override
     public ClassResponseDto assignInstructor(AssignInstructorDto assignInstructorDto) {
+        // 1. Fetch the required entities
         Class existingClass = classRepository.findById(assignInstructorDto.getClassId())
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + assignInstructorDto.getClassId()));
-
-        Instructor instructor = instructorRepository.findById(assignInstructorDto.getInstructorId())
+        Instructor instructorToAssign = instructorRepository.findById(assignInstructorDto.getInstructorId())
                 .orElseThrow(() -> new NoSuchElementException("Instructor not found with id: " + assignInstructorDto.getInstructorId()));
 
-        existingClass.setInstructor(instructor);
-        Class updatedClass = classRepository.save(existingClass);
-        return convertToDto(updatedClass);
+        DaysOfWeek dayToAssign = DaysOfWeek.valueOf(assignInstructorDto.getDayOfWeek().toUpperCase());
+        Shift classShift = existingClass.getShift();
+
+        // --- CONFLICT DETECTION LOGIC ---
+        // Find all other classes this instructor is assigned to.
+        List<ClassInstructor> instructorAssignments = classInstructorRepository.findByInstructor(instructorToAssign);
+
+        for (ClassInstructor assignment : instructorAssignments) {
+            // Check if the assignment is on the same day and in the same shift
+            boolean isSameDay = assignment.getDayOfWeek().equals(dayToAssign);
+            boolean isSameShift = assignment.getAClass().getShift().getShiftId().equals(classShift.getShiftId());
+            // Make sure we are not comparing the class to itself
+            boolean isDifferentClass = !assignment.getAClass().getClassId().equals(existingClass.getClassId());
+
+            if (isSameDay && isSameShift && isDifferentClass) {
+                // If a conflict is found, throw the custom exception.
+                throw new InstructorConflictException(
+                        "Conflict: Instructor " + instructorToAssign.getFirstName() + " " + instructorToAssign.getLastName() +
+                                " is already scheduled for another class (" + assignment.getAClass().getClassName() +
+                                ") at this time."
+                );
+            }
+        }
+        // --- END OF CONFLICT DETECTION ---
+
+
+        // Check for existing assignment on this day for this specific class
+        Optional<ClassInstructor> existingAssignment = existingClass.getClassInstructors().stream()
+                .filter(ci -> ci.getDayOfWeek().equals(dayToAssign))
+                .findFirst();
+
+        if (existingAssignment.isPresent()) {
+            ClassInstructor currentAssignment = existingAssignment.get();
+            // If the day is already assigned, but to a different instructor, it's a conflict within the class itself.
+            if (!currentAssignment.getInstructor().equals(instructorToAssign)) {
+                throw new InstructorConflictException(
+                        "Day " + dayToAssign + " is already assigned to another instructor for this class."
+                );
+            }
+            // If it's the same instructor, just update the online status.
+            currentAssignment.setOnline(assignInstructorDto.isOnline());
+            classInstructorRepository.save(currentAssignment);
+        } else {
+            // If no assignment exists for this day, create a new one.
+            ClassInstructor newAssignment = new ClassInstructor();
+            newAssignment.setAClass(existingClass);
+            newAssignment.setInstructor(instructorToAssign);
+            newAssignment.setDayOfWeek(dayToAssign);
+            newAssignment.setOnline(assignInstructorDto.isOnline());
+
+            existingClass.getClassInstructors().add(newAssignment);
+            classInstructorRepository.save(newAssignment);
+        }
+
+        // Return the updated class DTO
+        return convertToDto(classRepository.save(existingClass));
     }
+
+
+    @Override
+    @Transactional
+    public ClassResponseDto unassignInstructor(UnassignInstructorDto unassignInstructorDto) {
+        Class existingClass = classRepository.findById(unassignInstructorDto.getClassId())
+                .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + unassignInstructorDto.getClassId()));
+
+        DaysOfWeek day = DaysOfWeek.valueOf(unassignInstructorDto.getDayOfWeek().toUpperCase());
+
+        // Find the specific assignment to remove
+        Optional<ClassInstructor> assignmentToRemove = existingClass.getClassInstructors().stream()
+                .filter(ci -> ci.getDayOfWeek().equals(day))
+                .findFirst();
+
+        if (assignmentToRemove.isPresent()) {
+            ClassInstructor classInstructor = assignmentToRemove.get();
+            existingClass.getClassInstructors().remove(classInstructor);
+            classInstructorRepository.delete(classInstructor);
+        } else {
+            throw new NoSuchElementException("No instructor assigned to this class on " + day);
+        }
+
+        return convertToDto(existingClass);
+    }
+
 
     @Override
     public List<ClassResponseDto> getClassesForAuthenticatedInstructor(String instructorEmail) {
         Instructor instructor = instructorRepository.findByEmail(instructorEmail)
-                .orElseThrow(() -> new NoSuchElementException("Instructor not found: " + instructorEmail));
+                .orElseThrow(() -> new NoSuchElementException("Instructor not found with email: " + instructorEmail));
 
-        // ✅ USES THE CORRECT REPOSITORY METHOD
-        List<Class> classes = classRepository.findByInstructor_InstructorIdAndIsArchivedFalse(instructor.getInstructorId());
+        List<ClassInstructor> assignments = classInstructorRepository.findByInstructor(instructor);
+
+        List<Class> classes = assignments.stream()
+                .map(ClassInstructor::getAClass)
+                .filter(aClass -> !aClass.isArchived())
+                .distinct()
+                .collect(Collectors.toList());
 
         return classes.stream().map(this::convertToDto).collect(Collectors.toList());
     }

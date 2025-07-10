@@ -11,10 +11,10 @@ import org.example.roomschedulerapi.classroomscheduler.repository.DepartmentRepo
 import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.RoleRepository;
 import org.example.roomschedulerapi.classroomscheduler.service.InstructorService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -26,12 +26,13 @@ import java.util.stream.Collectors;
 public class InstructorServiceImpl implements InstructorService {
 
     private final InstructorRepository instructorRepository;
-    private final RoleRepository roleRepository; // To fetch Role by ID
     private final DepartmentRepository departmentRepository; // To fetch Department by ID
-    private final PasswordEncoder passwordEncoder; // Inject if using Spring Security for hashing
+    // RoleRepository and PasswordEncoder are no longer needed for patching but may be used elsewhere
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
 
-
+    // ... (convertToDto and other methods remain the same)
     private InstructorResponseDto convertToDto(Instructor instructor) {
         if (instructor == null) {
             return null;
@@ -47,11 +48,11 @@ public class InstructorServiceImpl implements InstructorService {
                 instructor.getProfile(),
                 instructor.getAddress(),
                 instructor.isArchived(),
-                instructor.getRole() != null ? instructor.getRole().getRoleName() : null, // Assuming Role has getRoleName()
-                instructor.getDepartment() != null ? instructor.getDepartment().getName() : null // Assuming Department has getName()
+                instructor.getRole() != null ? instructor.getRole().getRoleName() : null,
+                instructor.getDepartment() != null ? instructor.getDepartment().getDepartmentId() : null,
+                instructor.getDepartment() != null ? instructor.getDepartment().getName() : null
         );
     }
-
     @Override
     public List<InstructorResponseDto> getAllInstructors(Boolean isArchived) {
         List<Instructor> instructors;
@@ -102,67 +103,53 @@ public class InstructorServiceImpl implements InstructorService {
 
     @Override
     @Transactional
-    public InstructorResponseDto updateInstructor(Long instructorId, InstructorUpdateDto dto) {
-        // 1. Fetch the existing instructor entity
+    public InstructorResponseDto patchInstructor(Long instructorId, InstructorUpdateDto dto) {
         Instructor instructor = instructorRepository.findById(instructorId)
                 .orElseThrow(() -> new NoSuchElementException("Instructor not found with id: " + instructorId));
 
-        // 2. Update all provided fields from the DTO
-        if (dto.getFirstName() != null) {
+        // Update fields only if they are provided in the DTO
+        if (StringUtils.hasText(dto.getFirstName())) {
             instructor.setFirstName(dto.getFirstName());
         }
-        if (dto.getLastName() != null) {
+        if (StringUtils.hasText(dto.getLastName())) {
             instructor.setLastName(dto.getLastName());
         }
-        if (dto.getEmail() != null) {
-            // Check if the new email is different and if it's already taken by another user
+        if (StringUtils.hasText(dto.getEmail())) {
             if (!instructor.getEmail().equals(dto.getEmail())) {
-                instructorRepository.findByEmail(dto.getEmail()).ifPresent(existingInstructor -> {
-                    if (!existingInstructor.getInstructorId().equals(instructorId)) {
+                instructorRepository.findByEmail(dto.getEmail()).ifPresent(existing -> {
+                    if (!existing.getInstructorId().equals(instructorId)) {
                         throw new IllegalArgumentException("Email already in use: " + dto.getEmail());
                     }
                 });
                 instructor.setEmail(dto.getEmail());
             }
         }
-        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
-            // ✅ CORRECTED: Always encode the password before saving
-            instructor.setPassword(passwordEncoder.encode(dto.getPassword()));
-        }
-        if (dto.getPhone() != null) {
+        if (StringUtils.hasText(dto.getPhone())) {
             instructor.setPhone(dto.getPhone());
         }
-        if (dto.getDegree() != null) {
+        if (StringUtils.hasText(dto.getDegree())) {
             instructor.setDegree(dto.getDegree());
         }
-        if (dto.getMajor() != null) {
+        if (StringUtils.hasText(dto.getMajor())) {
             instructor.setMajor(dto.getMajor());
         }
-        if (dto.getProfile() != null) {
-            instructor.setProfile(dto.getProfile());
-        }
-        if (dto.getAddress() != null) {
+        if (StringUtils.hasText(dto.getAddress())) {
             instructor.setAddress(dto.getAddress());
         }
-        if (dto.getRoleId() != null) {
-            Role role = roleRepository.findById(dto.getRoleId())
-                    .orElseThrow(() -> new NoSuchElementException("Role not found with id: " + dto.getRoleId()));
-            instructor.setRole(role);
+
+        // Corrected variable name from 'updateDto' to 'dto'
+        if (StringUtils.hasText(dto.getProfile())) {
+            instructor.setProfile(dto.getProfile());
         }
+
         if (dto.getDepartmentId() != null) {
             Department department = departmentRepository.findById(dto.getDepartmentId())
                     .orElseThrow(() -> new NoSuchElementException("Department not found with id: " + dto.getDepartmentId()));
             instructor.setDepartment(department);
         }
-        if (dto.getIsArchived() != null) {
-            instructor.setArchived(dto.getIsArchived());
-        }
 
-        // 3. Save the updated entity
         Instructor updatedInstructor = instructorRepository.save(instructor);
-
-        // 4. Convert to DTO and return
-        return convertToDto(updatedInstructor); // Assuming you have this helper method
+        return convertToDto(updatedInstructor);
     }
 
     @Override
@@ -182,5 +169,22 @@ public class InstructorServiceImpl implements InstructorService {
             throw new NoSuchElementException("Instructor not found with id: " + instructorId);
         }
         instructorRepository.deleteById(instructorId);
+    }
+
+    @Override
+    @Transactional
+    public void resetPasswordByAdmin(Long instructorId, String newPassword) {
+        // 1. Find the target instructor by their ID
+        Instructor instructor = instructorRepository.findById(instructorId)
+                .orElseThrow(() -> new NoSuchElementException("Instructor not found with id: " + instructorId));
+
+        // 2. Encode the new password before saving
+        String encodedPassword = passwordEncoder.encode(newPassword);
+
+        // 3. Set the new, encoded password
+        instructor.setPassword(encodedPassword);
+
+        // 4. Save the updated instructor to the database
+        instructorRepository.save(instructor);
     }
 }

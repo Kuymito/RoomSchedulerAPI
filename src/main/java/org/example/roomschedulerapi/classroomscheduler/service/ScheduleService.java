@@ -14,4 +14,6 @@ public interface ScheduleService {
     List<ScheduleResponseDto> getAllSchedules();
     Optional<ScheduleResponseDto> getScheduleById(Long scheduleId);
     List<ScheduleResponseDto> getSchedulesForInstructor(Long instructorId);
+    void unassignRoomFromClass(Long scheduleId);
+    List<ScheduleResponseDto> getAllClassesWithScheduleStatus();
 }

@@ -85,9 +85,8 @@ public class RoomServiceImpl implements RoomService {
                     dailyDto.setAvailable(avail.getIsAvailable());
                     return dailyDto;
                 })
-                .collect(Collectors.toList());
+                .toList();
 
-        dto.setSchedule(dailyDtos);
         return dto;
     }
 }

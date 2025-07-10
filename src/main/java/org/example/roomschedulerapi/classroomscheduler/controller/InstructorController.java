@@ -1,6 +1,8 @@
 package org.example.roomschedulerapi.classroomscheduler.controller; // Adjust to your package
 
+import jakarta.validation.Valid;
 import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.AdminPasswordResetDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.InstructorCreateDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.InstructorResponseDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.InstructorUpdateDto;
@@ -8,6 +10,7 @@ import org.example.roomschedulerapi.classroomscheduler.service.InstructorService
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -42,25 +45,33 @@ public class InstructorController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<InstructorResponseDto>> createInstructor(@RequestBody /* @Valid */ InstructorCreateDto createDto) {
+    public ResponseEntity<ApiResponse<Object>> createInstructor(@Valid @RequestBody InstructorCreateDto instructorDto) {
         try {
-            InstructorResponseDto createdInstructor = instructorService.createInstructor(createDto);
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(new ApiResponse<>("Instructor created successfully", createdInstructor, HttpStatus.CREATED, LocalDateTime.now()));
-        } catch (IllegalArgumentException | NoSuchElementException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(new ApiResponse<>(e.getMessage(), null, HttpStatus.BAD_REQUEST, LocalDateTime.now()));
+            Object createdInstructor = instructorService.createInstructor(instructorDto);
+            ApiResponse<Object> response = new ApiResponse<>(
+                    "Instructor created successfully",
+                    createdInstructor,
+                    HttpStatus.CREATED,
+                    LocalDateTime.now()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
-            // Log the exception e
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ApiResponse<>("An unexpected error occurred while creating the instructor.", null, HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now()));
+            // Log the exception for debugging
+            System.err.println("Error creating instructor: " + e.getMessage());
+            ApiResponse<Object> errorResponse = new ApiResponse<>(
+                    "Error creating instructor: " + e.getMessage(),
+                    null,
+                    HttpStatus.BAD_REQUEST,
+                    LocalDateTime.now()
+            );
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
     }
 
-    @PutMapping("/{instructorId}")
-    public ResponseEntity<ApiResponse<InstructorResponseDto>> updateInstructor(@PathVariable Long instructorId, @RequestBody /* @Valid */ InstructorUpdateDto updateDto) {
+    @PatchMapping("/{instructorId}")
+    public ResponseEntity<ApiResponse<InstructorResponseDto>> patchInstructor(@PathVariable Long instructorId, @RequestBody /* @Valid */ InstructorUpdateDto updateDto) {
         try {
-            InstructorResponseDto updatedInstructor = instructorService.updateInstructor(instructorId, updateDto);
+            InstructorResponseDto updatedInstructor = instructorService.patchInstructor(instructorId, updateDto);
             return ResponseEntity.ok(new ApiResponse<>("Instructor updated successfully", updatedInstructor, HttpStatus.OK, LocalDateTime.now()));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -106,4 +117,6 @@ public class InstructorController {
                     .body(new ApiResponse<>("Error deleting instructor: " + e.getMessage(), null, HttpStatus.INTERNAL_SERVER_ERROR, LocalDateTime.now()));
         }
     }
+
+
 }

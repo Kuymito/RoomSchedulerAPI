@@ -2,10 +2,7 @@ package org.example.roomschedulerapi.classroomscheduler.service; // Adjust packa
 
 // Removed: import org.example.roomschedulerapi.classroomscheduler.model.Class;
 
-import org.example.roomschedulerapi.classroomscheduler.model.dto.AssignInstructorDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassCreateDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassResponseDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.ClassUpdateDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,4 +26,6 @@ public interface ClassService {
     ClassResponseDto assignInstructor(AssignInstructorDto assignInstructorDto);
 
     List<ClassResponseDto> getClassesForAuthenticatedInstructor(String instructorEmail);
+
+    ClassResponseDto unassignInstructor(UnassignInstructorDto unassignInstructorDto);
 }

@@ -26,7 +26,7 @@ public class ScheduleController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<ScheduleResponseDto>>> getAllSchedules() {
-        List<ScheduleResponseDto> schedules = scheduleService.getAllSchedules();
+        List<ScheduleResponseDto> schedules = scheduleService.getAllClassesWithScheduleStatus();
         ApiResponse<List<ScheduleResponseDto>> response = new ApiResponse<>(
                 "All schedules retrieved successfully",
                 schedules,
@@ -35,6 +35,8 @@ public class ScheduleController {
         );
         return ResponseEntity.ok(response);
     }
+
+
 
     @PostMapping("/assign")
     public ResponseEntity<ApiResponse<ScheduleResponseDto>> assignRoom(
@@ -62,6 +64,12 @@ public class ScheduleController {
                     LocalDateTime.now()
             ));
         }
+    }
+
+    @DeleteMapping("/{scheduleId}")
+    public ResponseEntity<Void> deleteSchedule(@PathVariable Long scheduleId) {
+        scheduleService.unassignRoomFromClass(scheduleId);
+        return ResponseEntity.noContent().build(); // Standard practice for successful DELETE
     }
 
     @GetMapping("/my-schedule")

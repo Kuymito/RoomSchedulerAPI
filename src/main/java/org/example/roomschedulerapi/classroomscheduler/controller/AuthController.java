@@ -4,19 +4,27 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.config.security.JwtUtil;
 import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
+import org.example.roomschedulerapi.classroomscheduler.model.Instructor;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
+import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepository;
 import org.example.roomschedulerapi.classroomscheduler.service.AuthService;
+import org.example.roomschedulerapi.classroomscheduler.service.InstructorService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -27,6 +35,8 @@ public class AuthController {
     private final UserDetailsService userDetailsService;
     private final JwtUtil jwtUtil;
     private final AuthService authService;
+    private final InstructorRepository instructorRepository;
+    private final InstructorService instructorService;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponseDto>> registerUser(@Valid @RequestBody RegisterRequestDto registerRequest) {
@@ -63,23 +73,56 @@ public class AuthController {
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<ApiResponse<Object>> getUserProfile(Authentication authentication) {
-        // The JwtAuthFilter ensures that the 'authentication' object is populated
-        // if a valid token is provided in the request header.
-        Object userProfile = authService.getCurrentUserProfile(authentication);
-        if (userProfile != null) {
-            return ResponseEntity.ok(new ApiResponse<>(
-                    "Profile retrieved successfully.",
-                    userProfile,
-                    HttpStatus.OK,
-                    LocalDateTime.now()
-            ));
+    public ResponseEntity<UserProfileResponse> getProfile(Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        String email = userDetails.getUsername();
+
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList());
+
+        Optional<Instructor> instructorOptional = instructorRepository.findByEmail(email);
+
+        if (instructorOptional.isPresent()) {
+            // Case 1: The user is an instructor.
+            Instructor instructor = instructorOptional.get();
+
+            // Get the department name, handling the possibility of a null department
+            String departmentName = (instructor.getDepartment() != null) ? instructor.getDepartment().getName() : null;
+
+            UserProfileResponse userProfile = new UserProfileResponse(
+                    instructor.getFirstName(),
+                    instructor.getLastName(),
+                    email,
+                    roles,
+                    instructor.getProfile(),
+                    departmentName ,
+                    instructor.getMajor(),
+                    instructor.getPhone(),
+                    instructor.getDegree(),
+                    instructor.getInstructorId()
+            );
+            return ResponseEntity.ok(userProfile);
+        } else if (roles.contains("ROLE_ADMIN")) {
+            // Case 2: The user is an admin but not in the instructor table.
+            UserProfileResponse adminProfile = new UserProfileResponse(
+                    "Admin",
+                    "User",
+                    email,
+                    roles,
+                    null,
+                    null, // No department for a generic admin
+                    null,
+                    null,
+                    null,
+                    null
+            );
+            return ResponseEntity.ok(adminProfile);
         } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse<>(
-                    "Unauthorized: No valid token provided.", null, HttpStatus.UNAUTHORIZED, LocalDateTime.now()));
+            // Case 3: User not found.
+            throw new java.util.NoSuchElementException("User profile not found for email: " + email);
         }
     }
-
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<String>> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDto request) {
         // Always return a generic success message to prevent user enumeration attacks
@@ -90,19 +133,6 @@ public class AuthController {
         return ResponseEntity.ok(new ApiResponse<>(
                 "If an account with that email exists, a password reset link has been sent.",
                 null, HttpStatus.OK, LocalDateTime.now()));
-    }
-
-    @PostMapping("/reset-password")
-    public ResponseEntity<ApiResponse<String>> resetPassword(@Valid @RequestBody ResetPasswordRequestDto request) {
-        try {
-            authService.resetPassword(request.getToken(), request.getNewPassword());
-            return ResponseEntity.ok(new ApiResponse<>(
-                    "Password has been reset successfully.",
-                    null, HttpStatus.OK, LocalDateTime.now()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ApiResponse<>(
-                    "Error resetting password: " + e.getMessage(), null, HttpStatus.BAD_REQUEST, LocalDateTime.now()));
-        }
     }
 
     @PostMapping("/reset-password-with-otp")
@@ -146,6 +176,17 @@ public class AuthController {
                     LocalDateTime.now()
             ));
         }
+    }
+
+    @PatchMapping("/{instructorId}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')") // This ensures only admins can access it
+    public ResponseEntity<Void> resetInstructorPasswordByAdmin(
+            @PathVariable Long instructorId,
+            @RequestBody AdminPasswordResetDto passwordResetDto) {
+
+        instructorService.resetPasswordByAdmin(instructorId, passwordResetDto.getNewPassword());
+
+        return ResponseEntity.ok().build();
     }
 }
 

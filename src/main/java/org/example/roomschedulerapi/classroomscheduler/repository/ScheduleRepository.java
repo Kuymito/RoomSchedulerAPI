@@ -1,5 +1,7 @@
 package org.example.roomschedulerapi.classroomscheduler.repository;
 
+import org.example.roomschedulerapi.classroomscheduler.model.Class;
+import org.example.roomschedulerapi.classroomscheduler.model.DaysOfWeek;
 import org.example.roomschedulerapi.classroomscheduler.model.Schedule;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.DetailedScheduleDto; // Make sure to import
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,7 +10,9 @@ import org.springframework.data.repository.query.Param; // Make sure to import
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate; // Make sure to import
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
@@ -47,8 +51,31 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
      * @return The count of unique rooms used.
      */
     //  s.day = :date AND
-    @Query("SELECT COUNT(DISTINCT s.room.roomId) FROM Schedule s WHERE s.aClass.shiftEntity.shiftId = :shiftId")
+    @Query("SELECT COUNT(DISTINCT s.room.roomId) FROM Schedule s WHERE s.aClass.shift.shiftId = :shiftId")
     long countDistinctRoomsUsedOnDateForShift(@Param("shiftId") Long shiftId);
 
-    List<Schedule> findByaClass_Instructor_InstructorId(Long instructorId);
+    Optional<Schedule> findByaClass_ClassId(Long classId);
+
+    @Query("SELECT s FROM Schedule s JOIN s.aClass.classInstructors ci WHERE ci.instructor.instructorId = :instructorId")
+    List<Schedule> findSchedulesByInstructorId(@Param("instructorId") Long instructorId);
+
+    List<Schedule> findAllByaClass_ClassId(Long classId);
+
+    List<Schedule> findByaClass(org.example.roomschedulerapi.classroomscheduler.model.Class aClass);
+
+    @Query("SELECT s FROM Schedule s " +
+            "JOIN s.aClass c " +
+            "JOIN c.classInstructors ci " +
+            "WHERE s.room.roomId = :roomId " +
+            "AND ci.dayOfWeek IN :days " +
+            "AND c.shift.startTime = :startTime " +
+            "AND c.shift.endTime = :endTime")
+    List<Schedule> findConflictingSchedules(
+            @Param("roomId") Long roomId,
+            @Param("days") List<DaysOfWeek> days,
+            @Param("startTime") LocalTime startTime,  // Changed to LocalTime
+            @Param("endTime") LocalTime endTime       // Changed to LocalTime
+    );
+
+    boolean existsByaClass(Class aClass);
 }
