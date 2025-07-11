@@ -9,6 +9,7 @@ import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleRespons
 import org.example.roomschedulerapi.classroomscheduler.service.ScheduleService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.web.bind.annotation.*;
@@ -84,6 +85,20 @@ public class ScheduleController {
 
         ApiResponse<List<ScheduleResponseDto>> response = new ApiResponse<>(
                 "Schedules for the current instructor retrieved successfully",
+                schedules,
+                HttpStatus.OK,
+                LocalDateTime.now()
+        );
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/instructor/{instructorId}")
+    @PreAuthorize("hasRole('ADMIN')") // Secures the endpoint for Admins only
+    public ResponseEntity<ApiResponse<List<ScheduleResponseDto>>> getSchedulesByInstructorId(@PathVariable Long instructorId) {
+        List<ScheduleResponseDto> schedules = scheduleService.getSchedulesForInstructor(instructorId);
+
+        ApiResponse<List<ScheduleResponseDto>> response = new ApiResponse<>(
+                "Schedules for instructor " + instructorId + " retrieved successfully",
                 schedules,
                 HttpStatus.OK,
                 LocalDateTime.now()

@@ -1,84 +1,69 @@
 package org.example.roomschedulerapi.classroomscheduler.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.ToString;
 import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
-import org.springframework.cglib.core.Local;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "change_requests")
-@Getter
-@Setter
+@Data // Use @Data for getters, setters, toString, etc.
 @NoArgsConstructor
 public class ChangeRequest {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "request_id")
-    private Long requestId;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "instructor_id", nullable = false)
-    private Instructor instructor;
+    @JoinColumn(name = "schedule_id", nullable = false)
+    private Schedule originalSchedule;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "class_id", nullable = false)
-    private Class aClass;
+    @JoinColumn(name = "instructor_id")
+    private Instructor requestingInstructor;
+
+    @OneToMany(
+            mappedBy = "changeRequest",
+            cascade = CascadeType.ALL, // Ensures operations (like delete) are cascaded to notifications
+            orphanRemoval = true       // Removes notifications if they are disconnected from a change request
+    )
+    private List<Notification> notifications;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_id")
-    private Room room;
+    @JoinColumn(name = "temporary_room_id", nullable = false)
+    private Room temporaryRoom;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "shift_id")
-    private Shift shift;
-
-    @Column(name = "description", nullable = false, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Enumerated(EnumType.STRING) // This stores the status as a clean string ("PENDING", "APPROVED") in the DB
-    @Column(name = "status") // It's best practice to rename the column from is_approved to status
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
     private RequestStatus status;
+
+    @Column(name = "effective_date", nullable = false)
+    private LocalDate effectiveDate; // The specific date the change is for
 
     @Column(name = "requested_at")
     private OffsetDateTime requestedAt;
 
-    @Column(name = "archived")
+    @Column(name = "is_archived", nullable = false)
     private boolean archived = false;
 
-    @Column(name = "expired")
-    private boolean expired = false;
-
-    @Column(name = "day_of_change")
-    private LocalDateTime dayOfChange;
-
-    // Add these setter methods
-    public void setRoom(Room room) {
-        this.room = room;
+    @Override
+    public String toString() {
+        return "ChangeRequest{" +
+                "id=" + id +
+                ", status=" + status +
+                // Only include IDs of related entities, not the full objects
+                ", requestingInstructorId=" + (requestingInstructor != null ? requestingInstructor.getInstructorId() : null) +
+                ", originalScheduleId=" + (originalSchedule != null ? originalSchedule.getScheduleId() : null) +
+                '}';
     }
 
-    public void setShift(Shift shift) {
-        this.shift = shift;
-    }
-
-    public RequestStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(RequestStatus status) {
-        this.status = status;
-    }
-
-    public LocalDateTime getDayOfChange() {
-        return dayOfChange;
-    }
-
-    public void setDayOfChange(LocalDateTime dayOfChange) {
-        this.dayOfChange = dayOfChange;
-    }
 }

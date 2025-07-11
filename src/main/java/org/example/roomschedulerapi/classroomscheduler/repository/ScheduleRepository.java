@@ -1,5 +1,6 @@
 package org.example.roomschedulerapi.classroomscheduler.repository;
 
+import org.example.roomschedulerapi.classroomscheduler.model.ChangeRequest;
 import org.example.roomschedulerapi.classroomscheduler.model.Class;
 import org.example.roomschedulerapi.classroomscheduler.model.DaysOfWeek;
 import org.example.roomschedulerapi.classroomscheduler.model.Schedule;
@@ -78,4 +79,7 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
     );
 
     boolean existsByaClass(Class aClass);
+
+    @Query("SELECT cr FROM ChangeRequest cr JOIN FETCH cr.originalSchedule")
+    List<ChangeRequest> findAllWithSchedules();
 }

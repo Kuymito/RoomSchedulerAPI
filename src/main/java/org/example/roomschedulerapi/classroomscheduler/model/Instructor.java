@@ -130,10 +130,10 @@ public class Instructor implements UserDetails {
     @Override
     public String toString() {
         return "Instructor{" +
-                "instructorId=" + instructorId +
+                "id=" + instructorId +
                 ", firstName='" + firstName + '\'' +
                 ", lastName='" + lastName + '\'' +
-                ", email='" + email + '\'' +
+                // Exclude bidirectional relationships
                 '}';
     }
 }

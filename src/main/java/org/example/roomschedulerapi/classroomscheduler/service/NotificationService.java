@@ -5,10 +5,13 @@ import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.model.*;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.NotificationResponseDto;
 import org.example.roomschedulerapi.classroomscheduler.repository.AdminRepository;
+import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.NotificationRepository;
+import org.example.roomschedulerapi.classroomscheduler.repository.RoomRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -21,42 +24,44 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final AdminRepository adminRepository;
+    private final InstructorRepository instructorRepository;
 
     /**
      * Creates a notification for all admins.
      */
     public void createNotificationForAdmins(ChangeRequest changeRequest, String message) {
         List<Admin> admins = adminRepository.findAll();
-        for (Admin admin : admins) {
+        if (admins.isEmpty()) return;
+
+        List<Notification> notificationsToSave = admins.stream().map(admin -> {
             Notification notification = new Notification();
             notification.setAdmin(admin);
             notification.setChangeRequest(changeRequest);
             notification.setMessage(message);
-            notification.setCreatedAt(OffsetDateTime.now());
-            notificationRepository.save(notification);
-        }
+            return notification;
+        }).collect(Collectors.toList());
+        notificationRepository.saveAll(notificationsToSave);
     }
 
-    /**
-     * Creates a notification for a specific instructor.
-     */
-    public void createNotificationForInstructor(Instructor instructor, ChangeRequest changeRequest, String message) {
+    public void createNotificationForInstructor(Long instructorId, ChangeRequest changeRequest, String message) {
+        // FIX: Fetch the instructor from the database to ensure it is a managed entity.
+        Instructor instructor = instructorRepository.findById(instructorId)
+                .orElseThrow(() -> new NoSuchElementException("Cannot create notification for non-existent instructor with id: " + instructorId));
+
         Notification notification = new Notification();
-        notification.setInstructor(instructor);
+        notification.setInstructor(instructor); // Use the managed instructor object
         notification.setChangeRequest(changeRequest);
         notification.setMessage(message);
-        notification.setCreatedAt(OffsetDateTime.now());
         notificationRepository.save(notification);
     }
 
     public List<NotificationResponseDto> getNotificationsForUser(UserDetails userDetails) {
         List<Notification> notifications;
 
-        if (userDetails instanceof Admin) {
-            Admin admin = (Admin) userDetails;
-            notifications = notificationRepository.findByAdmin_AdminIdOrderByCreatedAtDesc(Math.toIntExact(admin.getAdminId()));
-        } else if (userDetails instanceof Instructor) {
-            Instructor instructor = (Instructor) userDetails;
+        if (userDetails instanceof Admin admin) {
+            // No more need for Math.toIntExact()
+            notifications = notificationRepository.findByAdmin_AdminIdOrderByCreatedAtDesc(admin.getAdminId());
+        } else if (userDetails instanceof Instructor instructor) {
             notifications = notificationRepository.findByInstructor_InstructorIdOrderByCreatedAtDesc(instructor.getInstructorId());
         } else {
             return Collections.emptyList();
@@ -81,8 +86,8 @@ public class NotificationService {
     private NotificationResponseDto convertToDto(Notification notification) {
         NotificationResponseDto dto = new NotificationResponseDto();
 
-        dto.setNotificationId(notification.getNotificationId());
-        dto.setChangeRequestId(notification.getChangeRequest().getRequestId());
+        dto.setNotificationId(notification.getId());
+        dto.setChangeRequestId(notification.getChangeRequest().getId());
         dto.setMessage(notification.getMessage());
         dto.setRead(notification.isRead());
         dto.setCreatedAt(notification.getCreatedAt());

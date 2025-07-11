@@ -1,42 +1,51 @@
 package org.example.roomschedulerapi.classroomscheduler.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-
+import org.hibernate.annotations.CreationTimestamp;
 import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "notifications")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 public class Notification {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "notification_id")
-    private Long notificationId;
+    private Long id;
 
+    // A notification can belong to an Instructor
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "admin_id")
+    @JoinColumn(name = "instructor_id") // Nullable
+    private Instructor instructor;
+
+    // OR it can belong to an Admin
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "admin_id") // Nullable
     private Admin admin;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "instructor_id")
-    private Instructor instructor;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "change_request_id")
+    @JoinColumn(name = "change_request_id", nullable = false)
     private ChangeRequest changeRequest;
 
-    @Column(name = "message", nullable = false)
+    @Column(nullable = false)
     private String message;
 
-    @Column(name = "is_read")
+    @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
 
+    @CreationTimestamp
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
+
+    @Override
+    public String toString() {
+        return "Notification{" +
+                "id=" + id +
+                // Only include IDs of related entities
+                ", changeRequestId=" + (changeRequest != null ? changeRequest.getId() : null) +
+                '}';
+    }
 }

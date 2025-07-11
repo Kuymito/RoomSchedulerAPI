@@ -2,18 +2,22 @@ package org.example.roomschedulerapi.classroomscheduler.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.model.*;
-import org.example.roomschedulerapi.classroomscheduler.model.Class;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ChangeRequestCreateDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ChangeRequestResponseDto;
-import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus; // <-- Make sure you have this enum
+import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
 import org.example.roomschedulerapi.classroomscheduler.repository.*;
 import org.example.roomschedulerapi.classroomscheduler.service.ChangeRequestService;
 import org.example.roomschedulerapi.classroomscheduler.service.NotificationService;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.TextStyle;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,47 +25,53 @@ import java.util.stream.Collectors;
 public class ChangeRequestServiceImpl implements ChangeRequestService {
 
     private final ChangeRequestRepository changeRequestRepository;
-    private final InstructorRepository instructorRepository;
-    private final ClassRepository classRepository;
-    private final RoomRepository roomRepository;
-    private final ShiftRepository shiftRepository;
     private final ScheduleRepository scheduleRepository;
-    private final NotificationService  notificationService;
+    private final InstructorRepository instructorRepository;
+    private final RoomRepository roomRepository;
+    private final NotificationService notificationService;
 
     @Override
-    @Transactional
-    public ChangeRequestResponseDto createChangeRequest(ChangeRequestCreateDto requestDto, Long instructorId) {
-        Instructor instructor = instructorRepository.findById(instructorId)
-                .orElseThrow(() -> new NoSuchElementException("Instructor not found with ID: " + instructorId));
+    public ChangeRequestResponseDto createChangeRequest(ChangeRequestCreateDto requestDto, Instructor instructor) {
+        Schedule schedule = scheduleRepository.findById(requestDto.getScheduleId())
+                .orElseThrow(() -> new NoSuchElementException("Schedule not found with id: " + requestDto.getScheduleId()));
+        Room tempRoom = roomRepository.findById(requestDto.getNewRoomId())
+                .orElseThrow(() -> new NoSuchElementException("Temporary room not found with id: " + requestDto.getNewRoomId()));
 
-        Class aClass = classRepository.findById(requestDto.getClassId())
-                .orElseThrow(() -> new NoSuchElementException("Class not found with ID: " + requestDto.getClassId()));
+        ChangeRequest newRequest = new ChangeRequest();
+        newRequest.setRequestingInstructor(instructor);
+        newRequest.setOriginalSchedule(schedule);
+        newRequest.setTemporaryRoom(tempRoom);
+        newRequest.setEffectiveDate(requestDto.getEffectiveDate());
+        newRequest.setDescription(requestDto.getDescription());
+        newRequest.setStatus(RequestStatus.PENDING);
+        newRequest.setRequestedAt(OffsetDateTime.now());
 
-        Room room = roomRepository.findById(requestDto.getRoomId())
-                .orElseThrow(() -> new NoSuchElementException("Room not found with ID: " + requestDto.getRoomId()));
+        ChangeRequest savedRequest = changeRequestRepository.save(newRequest);
 
-        Shift shift = shiftRepository.findById(requestDto.getShiftId())
-                .orElseThrow(() -> new NoSuchElementException("Shift not found with ID: " + requestDto.getShiftId()));
+        // --- NOTIFICATION LOGIC ---
 
-        // --- Business Logic for Creating the Request ---
-        ChangeRequest changeRequest = new ChangeRequest();
-        changeRequest.setInstructor(instructor);
-        changeRequest.setAClass(aClass);
-        changeRequest.setRoom(room);
-        changeRequest.setShift(shift);
-        changeRequest.setDescription(requestDto.getDescription());
-        changeRequest.setDayOfChange(requestDto.getDayOfChange()); // Set the new date
-        changeRequest.setStatus(RequestStatus.PENDING); // Default status
+        // 1. Notify Admins
+        String adminMessage = String.format(
+                "New request from %s %s for class '%s' requires your approval.",
+                instructor.getFirstName(),
+                instructor.getLastName(),
+                schedule.getAClass().getClassName()
+        );
+        notificationService.createNotificationForAdmins(savedRequest, adminMessage);
 
-        ChangeRequest savedRequest = changeRequestRepository.save(changeRequest);
-
-        // --- Notification Logic ---
-        String instructorName = instructor.getFirstName() + " " + instructor.getLastName();
-        notificationService.createNotificationForAdmins(savedRequest, "New change request from " + instructorName + " requires your approval.");
-        notificationService.createNotificationForInstructor(instructor, savedRequest, "Your change request for class '" + aClass.getClassName() + "' has been submitted successfully.");
+        // 2. Notify Instructor
+        String instructorMessage = String.format(
+                "Your request to move class '%s' to room '%s' on %s has been submitted.",
+                schedule.getAClass().getClassName(),
+                tempRoom.getRoomName(),
+                savedRequest.getEffectiveDate()
+        );
+        // FIX: Pass the instructor's ID instead of the detached object.
+        notificationService.createNotificationForInstructor(instructor.getInstructorId(), savedRequest, instructorMessage);
 
         return convertToDto(savedRequest);
     }
+
 
     @Override
     public List<ChangeRequestResponseDto> getAllChangeRequests() {
@@ -71,82 +81,56 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
     }
 
     @Override
-    @Transactional
     public ChangeRequestResponseDto approveChangeRequest(Long requestId) {
-        ChangeRequest changeRequest = changeRequestRepository.findById(requestId)
-                .orElseThrow(() -> new NoSuchElementException("Change request not found with ID: " + requestId));
+        ChangeRequest request = findRequestById(requestId);
+        request.setStatus(RequestStatus.APPROVED);
+        ChangeRequest savedRequest = changeRequestRepository.save(request);
 
-        changeRequest.setStatus(RequestStatus.APPROVED);
-
-        // --- THIS IS THE FIX ---
-        // Fetch a list of schedules for the class.
-        List<Schedule> schedules = scheduleRepository.findAllByaClass_ClassId(changeRequest.getAClass().getClassId());
-
-        // If there are schedules, update the first one. Otherwise, create a new one.
-        Schedule scheduleToUpdate = schedules.isEmpty() ? new Schedule() : schedules.get(0);
-
-        scheduleToUpdate.setAClass(changeRequest.getAClass());
-
-        if (changeRequest.getRoom() != null) {
-            scheduleToUpdate.setRoom(changeRequest.getRoom());
-        }
-        if (changeRequest.getShift() != null) {
-            scheduleToUpdate.getAClass().setShift(changeRequest.getShift());
-        }
-
-        // Save the updated or new schedule, and the updated change request.
-        scheduleRepository.save(scheduleToUpdate);
-        changeRequestRepository.save(changeRequest);
-
-        notificationService.createNotificationForInstructor(
-                changeRequest.getInstructor(),
-                changeRequest,
-                "Your change request for class '" + changeRequest.getAClass().getClassName() + "' has been approved."
+        // --- ADD NOTIFICATION LOGIC ---
+        String message = String.format(
+                "Your request for class '%s' on %s has been APPROVED.",
+                savedRequest.getOriginalSchedule().getAClass().getClassName(),
+                savedRequest.getEffectiveDate()
         );
+        notificationService.createNotificationForInstructor(savedRequest.getId(), savedRequest, message);
 
-        return convertToDto(changeRequest);
+        return convertToDto(savedRequest);
     }
-
-
 
     @Override
-    @Transactional
     public ChangeRequestResponseDto denyChangeRequest(Long requestId) {
-        ChangeRequest changeRequest = changeRequestRepository.findById(requestId)
-                .orElseThrow(() -> new NoSuchElementException("Change request not found"));
+        ChangeRequest request = findRequestById(requestId);
+        request.setStatus(RequestStatus.DENIED);
+        ChangeRequest savedRequest = changeRequestRepository.save(request);
 
-        // CORRECT: Set status to DENIED
-        changeRequest.setStatus(RequestStatus.DENIED);
-        changeRequestRepository.save(changeRequest);
+        // --- ADD NOTIFICATION LOGIC ---
+        String message = String.format(
+                "Your request for class '%s' on %s has been DENIED.",
+                savedRequest.getOriginalSchedule().getAClass().getClassName(),
+                savedRequest.getEffectiveDate()
+        );
+        notificationService.createNotificationForInstructor(savedRequest.getId(), savedRequest, message);
 
-        // CORRECT: Send the "denied" notification HERE, not in the converter.
-        notificationService.createNotificationForInstructor(changeRequest.getInstructor(), changeRequest, "Your change request for class '" + changeRequest.getAClass().getClassName() + "' has been denied.");
-
-        return convertToDto(changeRequest);
+        return convertToDto(savedRequest);
     }
 
-    private ChangeRequestResponseDto convertToDto(ChangeRequest changeRequest) {
+    private ChangeRequest findRequestById(Long requestId) {
+        return changeRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NoSuchElementException("ChangeRequest not found with id: " + requestId));
+    }
+
+    private ChangeRequestResponseDto convertToDto(ChangeRequest request) {
         ChangeRequestResponseDto dto = new ChangeRequestResponseDto();
-        dto.setRequestId(changeRequest.getRequestId());
-        dto.setClassId(changeRequest.getAClass().getClassId());
-        dto.setClassName(changeRequest.getAClass().getClassName());
-
-        if (changeRequest.getRoom() != null) {
-            dto.setNewRoomId(changeRequest.getRoom().getRoomId());
-            dto.setNewRoomName(changeRequest.getRoom().getRoomName());
-        }
-        if (changeRequest.getShift() != null) {
-            dto.setNewShiftId(changeRequest.getShift().getShiftId());
-            dto.setNewShiftName(changeRequest.getShift().getName());
-        }
-
-        dto.setDescription(changeRequest.getDescription());
-        dto.setDayOfChange(changeRequest.getDayOfChange()); // Include in the response DTO
-        dto.setStatus(changeRequest.getStatus());
-        dto.setRequestedAt(changeRequest.getRequestedAt());
-
+        dto.setId(request.getId());
+        dto.setStatus(request.getStatus());
+        dto.setDescription(request.getDescription());
+        dto.setEffectiveDate(request.getEffectiveDate());
+        dto.setRequestedAt(request.getRequestedAt());
+        dto.setScheduleId(request.getOriginalSchedule().getScheduleId());
+        dto.setClassName(request.getOriginalSchedule().getAClass().getClassName());
+        dto.setRequestingInstructorName(request.getRequestingInstructor().getFirstName() + " " + request.getRequestingInstructor().getLastName());
+        dto.setOriginalRoomName(request.getOriginalSchedule().getRoom().getRoomName());
+        dto.setTemporaryRoomName(request.getTemporaryRoom().getRoomName());
         return dto;
     }
-
-
 }

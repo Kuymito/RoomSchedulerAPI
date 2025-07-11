@@ -37,7 +37,9 @@ public class DashboardServiceImpl implements DashboardService {
         long classAssignCount = scheduleRepository.count();
         long unassignedClassCount = classRepository.countUnassignedClasses();
         long onlineClassCount = classRepository.countByIsOnline(true);
-        long expiredCount = changeRequestRepository.countByExpired(true);
+
+        // FIX: Call the new custom query method
+        long expiredCount = changeRequestRepository.countExpiredRequests(LocalDate.now());
 
         Map<String, Long> roomAvailability = calculateWeeklyRoomAvailability(shiftId);
 
