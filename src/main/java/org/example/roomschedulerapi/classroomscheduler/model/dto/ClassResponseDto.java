@@ -15,8 +15,7 @@ public class ClassResponseDto {
     private String groupName;
     private String majorName;
     private String degreeName;
-    private String semester;
-    private boolean isOnline; // General flag for the class
+    private String semester;// General flag for the class
     private boolean isFree;
     private boolean isArchived;
     private LocalDateTime createdAt;
@@ -28,7 +27,7 @@ public class ClassResponseDto {
     private Map<String, ClassDayDetailsDto> dailySchedule;
 
     public ClassResponseDto(Long classId, String className, String generation, String groupName, String majorName,
-                            String degreeName, String semester, boolean isOnline, boolean isFree, boolean isArchived,
+                            String degreeName, String semester, boolean isFree, boolean isArchived,
                             LocalDateTime createdAt, LocalDateTime archivedAt, Map<String, ClassDayDetailsDto> dailySchedule,
                             DepartmentResponseDto department, ShiftResponseDto shift) {
         this.classId = classId;
@@ -38,7 +37,6 @@ public class ClassResponseDto {
         this.majorName = majorName;
         this.degreeName = degreeName;
         this.semester = semester;
-        this.isOnline = isOnline;
         this.isFree = isFree;
         this.isArchived = isArchived;
         this.createdAt = createdAt;

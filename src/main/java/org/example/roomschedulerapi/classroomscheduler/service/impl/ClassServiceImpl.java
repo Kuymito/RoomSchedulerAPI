@@ -92,7 +92,7 @@ public class ClassServiceImpl implements ClassService {
 
 
         return new ClassResponseDto(aClass.getClassId(), aClass.getClassName(), aClass.getGeneration(), aClass.getGroupName(), aClass.getMajorName(),
-                aClass.getDegreeName(), aClass.getSemester(), aClass.isOnline(), aClass.isFree(), aClass.isArchived(),
+                aClass.getDegreeName(), aClass.getSemester(), aClass.isFree(), aClass.isArchived(),
                 aClass.getCreatedAt(), aClass.getArchivedAt(), dailyScheduleMap, departmentDto, shiftDto);
     }
 
