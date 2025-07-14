@@ -61,7 +61,7 @@ public class JwtUtil {
             Admin admin = (Admin) userDetails;
             // Assuming your Admin entity has a 'fullName' field
             // If it has firstName/lastName, use those instead for consistency
-            extraClaims.put("firstName", admin.getFullName());
+            extraClaims.put("firstName", admin.getFirstName());
             extraClaims.put("lastName", ""); // Admins might not have a separate last name
         }
 

@@ -3,9 +3,11 @@ package org.example.roomschedulerapi.classroomscheduler.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.config.security.JwtUtil;
+import org.example.roomschedulerapi.classroomscheduler.model.Admin;
 import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
 import org.example.roomschedulerapi.classroomscheduler.model.Instructor;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
+import org.example.roomschedulerapi.classroomscheduler.repository.AdminRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepository;
 import org.example.roomschedulerapi.classroomscheduler.service.AuthService;
 import org.example.roomschedulerapi.classroomscheduler.service.InstructorService;
@@ -37,6 +39,7 @@ public class AuthController {
     private final AuthService authService;
     private final InstructorRepository instructorRepository;
     private final InstructorService instructorService;
+    private final AdminRepository adminRepository;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponseDto>> registerUser(@Valid @RequestBody RegisterRequestDto registerRequest) {
@@ -100,24 +103,34 @@ public class AuthController {
                     instructor.getMajor(),
                     instructor.getPhone(),
                     instructor.getDegree(),
-                    instructor.getInstructorId()
+                    instructor.getInstructorId(),
+                    instructor.getAddress()
             );
             return ResponseEntity.ok(userProfile);
         } else if (roles.contains("ROLE_ADMIN")) {
+
             // Case 2: The user is an admin but not in the instructor table.
-            UserProfileResponse adminProfile = new UserProfileResponse(
-                    "Admin",
-                    "User",
-                    email,
-                    roles,
-                    null,
-                    null, // No department for a generic admin
-                    null,
-                    null,
-                    null,
-                    null
-            );
-            return ResponseEntity.ok(adminProfile);
+            Optional<Admin> adminOptional = adminRepository.findByEmail(email);
+            if (adminOptional.isPresent()) {
+                Admin admin = adminOptional.get();
+                UserProfileResponse adminProfile = new UserProfileResponse(
+                        admin.getFirstName(),
+                        admin.getLastName(),
+                        email,
+                        roles,
+                        admin.getProfile(),
+                        null, // No department for admin
+                        null, // No major for admin
+                        admin.getPhoneNumber(),
+                        null, // No degree for admin
+                        (long) admin.getAdminId(),
+                        admin.getAddress()
+                );
+                return ResponseEntity.ok(adminProfile);
+            } else {
+                // This case should ideally not happen if the JWT is valid and the user is in the database.
+                throw new NoSuchElementException("Admin profile not found for email: " + email);
+            }
         } else {
             // Case 3: User not found.
             throw new java.util.NoSuchElementException("User profile not found for email: " + email);

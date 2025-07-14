@@ -3,11 +3,9 @@ package org.example.roomschedulerapi.classroomscheduler.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.model.*;
 import org.example.roomschedulerapi.classroomscheduler.model.Class;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.DayDetailDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleRequestDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleResponseDto;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.ShiftResponseDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
 import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
+import org.example.roomschedulerapi.classroomscheduler.exception.ResourceNotFoundException;
 import org.example.roomschedulerapi.classroomscheduler.repository.ChangeRequestRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.ClassRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.RoomRepository;
@@ -35,7 +33,7 @@ public class ScheduleServiceImpl implements ScheduleService {
         List<Schedule> permanentSchedules = scheduleRepository.findSchedulesByInstructorId(instructorId);
 
         // 2. Find all approved change requests linked to these permanent schedules.
-        List<ChangeRequest> allOverrides = changeRequestRepository.findAllByOriginalScheduleInAndStatus(permanentSchedules, RequestStatus.APPROVED);
+        List<ChangeRequest> allOverrides = changeRequestRepository.findActiveApprovedChangesForSchedules(permanentSchedules, LocalDate.now());
 
         // 3. Create a Set of schedule IDs that have been moved.
         Set<Long> movedScheduleIds = allOverrides.stream()
@@ -60,10 +58,39 @@ public class ScheduleServiceImpl implements ScheduleService {
     }
 
     @Override
+    @Transactional
+    public void swapSchedules(ScheduleSwapDto swapDto) {
+        if (swapDto.getScheduleId1().equals(swapDto.getScheduleId2())) {
+            // No need to swap if it's the same schedule
+            return;
+        }
+
+        // Find both schedules, or throw an exception if not found
+        Schedule schedule1 = scheduleRepository.findById(swapDto.getScheduleId1())
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", swapDto.getScheduleId1()));
+
+        Schedule schedule2 = scheduleRepository.findById(swapDto.getScheduleId2())
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", swapDto.getScheduleId2()));
+
+        // Get the rooms from each schedule
+        Room room1 = schedule1.getRoom();
+        Room room2 = schedule2.getRoom();
+
+        // Swap the rooms
+        schedule1.setRoom(room2);
+        schedule2.setRoom(room1);
+
+        // Save both updated schedules to the database
+        scheduleRepository.save(schedule1);
+        scheduleRepository.save(schedule2);
+    }
+
+
+    @Override
     public List<ScheduleResponseDto> getAllClassesWithScheduleStatus() {
         // This method now uses the same robust logic.
         List<Schedule> allPermanentSchedules = scheduleRepository.findAll();
-        List<ChangeRequest> allOverrides = changeRequestRepository.findAllByStatus(RequestStatus.APPROVED);
+        List<ChangeRequest> allOverrides = changeRequestRepository.findAllActiveApprovedChanges(LocalDate.now());
 
         Set<Long> movedScheduleIds = allOverrides.stream()
                 .map(cr -> cr.getOriginalSchedule().getScheduleId())
@@ -94,6 +121,16 @@ public class ScheduleServiceImpl implements ScheduleService {
         return scheduleRepository.findAll().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public ScheduleResponseDto moveSchedule(Long scheduleId, Long newRoomId) {
+        Schedule schedule = scheduleRepository.findById(scheduleId).orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", scheduleId));
+        Room newRoom = roomRepository.findById(newRoomId).orElseThrow(() -> new ResourceNotFoundException("Room", "id", newRoomId));
+        schedule.setRoom(newRoom);
+        Schedule updatedSchedule = scheduleRepository.save(schedule);
+        return convertToDto(updatedSchedule); // Use manual mapping
     }
 
     @Override

@@ -20,4 +20,5 @@ public class UserProfileResponse {
     private String phone;
     private String degree;
     private Long id;
+    private String address;
 }

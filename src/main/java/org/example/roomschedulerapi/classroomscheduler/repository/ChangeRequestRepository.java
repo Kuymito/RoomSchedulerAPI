@@ -34,4 +34,10 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
     void deleteByEffectiveDateBefore(LocalDate yesterday);
 
     void deleteAllByOriginalSchedule_ScheduleId(Long scheduleId);
+
+    @Query("SELECT cr FROM ChangeRequest cr WHERE cr.originalSchedule IN :schedules AND cr.status = 'APPROVED' AND cr.effectiveDate >= :currentDate")
+    List<ChangeRequest> findActiveApprovedChangesForSchedules(@Param("schedules") List<Schedule> schedules, @Param("currentDate") LocalDate currentDate);
+
+    @Query("SELECT cr FROM ChangeRequest cr WHERE cr.status = 'APPROVED' AND cr.effectiveDate >= :currentDate")
+    List<ChangeRequest> findAllActiveApprovedChanges(@Param("currentDate") LocalDate currentDate);
 }

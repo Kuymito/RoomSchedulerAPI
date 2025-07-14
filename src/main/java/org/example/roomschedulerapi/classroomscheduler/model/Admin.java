@@ -33,6 +33,15 @@ public class Admin implements UserDetails {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
+    @Column(name = "phone_number")
+    private String phoneNumber;
+
+    @Column(name = "address")
+    private String address;
+
+    @Column(name = "profile")
+    private String profile;
+
     // --- UserDetails Implementation ---
 
     @Override

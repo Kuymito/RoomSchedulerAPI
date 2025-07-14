@@ -14,4 +14,5 @@ public class NotificationResponseDto {
     private boolean isRead;
     private OffsetDateTime createdAt;
     private RequestStatus status;
+    private String profile;
 }

@@ -3,7 +3,6 @@ package org.example.roomschedulerapi.classroomscheduler.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
 
 import java.time.LocalDate;
@@ -12,7 +11,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "change_requests")
-@Data // Use @Data for getters, setters, toString, etc.
+@Data
 @NoArgsConstructor
 public class ChangeRequest {
 
@@ -21,7 +20,7 @@ public class ChangeRequest {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "schedule_id", nullable = false)
+    @JoinColumn(name = "schedule_id", nullable = true) // Set to nullable
     private Schedule originalSchedule;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -30,8 +29,8 @@ public class ChangeRequest {
 
     @OneToMany(
             mappedBy = "changeRequest",
-            cascade = CascadeType.ALL, // Ensures operations (like delete) are cascaded to notifications
-            orphanRemoval = true       // Removes notifications if they are disconnected from a change request
+            cascade = CascadeType.ALL,
+            orphanRemoval = true
     )
     private List<Notification> notifications;
 
@@ -47,7 +46,7 @@ public class ChangeRequest {
     private RequestStatus status;
 
     @Column(name = "effective_date", nullable = false)
-    private LocalDate effectiveDate; // The specific date the change is for
+    private LocalDate effectiveDate;
 
     @Column(name = "requested_at")
     private OffsetDateTime requestedAt;
@@ -60,10 +59,8 @@ public class ChangeRequest {
         return "ChangeRequest{" +
                 "id=" + id +
                 ", status=" + status +
-                // Only include IDs of related entities, not the full objects
                 ", requestingInstructorId=" + (requestingInstructor != null ? requestingInstructor.getInstructorId() : null) +
                 ", originalScheduleId=" + (originalSchedule != null ? originalSchedule.getScheduleId() : null) +
                 '}';
     }
-
 }

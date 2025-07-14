@@ -2,6 +2,7 @@ package org.example.roomschedulerapi.classroomscheduler.service;
 
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleRequestDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleResponseDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleSwapDto;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -16,4 +17,6 @@ public interface ScheduleService {
     List<ScheduleResponseDto> getSchedulesForInstructor(Long instructorId);
     void unassignRoomFromClass(Long scheduleId);
     List<ScheduleResponseDto> getAllClassesWithScheduleStatus();
+    void swapSchedules(ScheduleSwapDto swapDto);
+    ScheduleResponseDto moveSchedule(Long scheduleId, Long newRoomId);
 }
