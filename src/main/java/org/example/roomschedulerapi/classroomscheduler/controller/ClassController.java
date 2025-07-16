@@ -1,5 +1,7 @@
     package org.example.roomschedulerapi.classroomscheduler.controller; // Adjust package
 
+    import io.swagger.v3.oas.annotations.Operation;
+    import io.swagger.v3.oas.annotations.Parameter;
     import jakarta.validation.Valid;
     import org.example.roomschedulerapi.classroomscheduler.model.ApiResponse;
     import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
@@ -161,5 +163,16 @@
             return ResponseEntity.ok(new ApiResponse<>(
                     "Assigned classes retrieved successfully", classes, HttpStatus.OK, LocalDateTime.now()
             ));
+        }
+
+        @GetMapping("/expired")
+        @Operation(summary = "Get all classes or filter by expiration status")
+        public ResponseEntity<ApiResponse<List<ClassResponseDto>>> getClasses(
+                @Parameter(description = "Filter by expiration status (true or false). If omitted, returns all classes.")
+                @RequestParam(required = false) Boolean expired
+        ) {
+            List<ClassResponseDto> classes;
+            classes = classService.getClassesByExpirationStatus(expired);
+            return ResponseEntity.ok(new ApiResponse<>("Classes retrieved successfully.", classes, HttpStatus.OK, LocalDateTime.now()));
         }
     }

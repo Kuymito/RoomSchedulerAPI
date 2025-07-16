@@ -13,6 +13,7 @@ public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender javaMailSender;
 
+    // This value is still used for the password reset email, so we keep it.
     @Value("${spring.mail.username}")
     private String fromEmail;
 
@@ -27,8 +28,8 @@ public class EmailServiceImpl implements EmailService {
             System.out.println("Attempting to send OTP email synchronously...");
             SimpleMailMessage message = new SimpleMailMessage();
 
-            // Set the 'From' address to match the authenticated user
-            message.setFrom(fromEmail);
+            // 🟢 FIX: The explicit setFrom() call has been removed.
+            // Spring Boot will automatically use the 'spring.mail.username' property.
 
             message.setTo(toEmail);
             message.setSubject("Your OTP Code for Verification");
@@ -41,6 +42,7 @@ public class EmailServiceImpl implements EmailService {
 
         } catch (Exception e) {
             System.err.println("Error caught in EmailServiceImpl. Re-throwing...");
+            // It's better to throw the specific exception to get more details in logs.
             throw new RuntimeException("Failed to send OTP email: " + e.getMessage(), e);
         }
     }

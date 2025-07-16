@@ -1,28 +1,26 @@
 package org.example.roomschedulerapi.classroomscheduler.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 
 @Entity
-@Getter
-@Setter
-@Table(name = "RoomAvailability")
+@Table(name = "room_availability")
+@Data
 public class RoomAvailability {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer availabilityId;
+    private Long id;
 
-    @Column(nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "room_id")
+    private Room room;
+
+    @Column(name = "day_of_week")
     private String dayOfWeek;
 
-    @Column(nullable = false)
+    @Column(name = "is_available")
     private Boolean isAvailable;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "room_id", nullable = false)
-    @JsonIgnore // Prevents infinite recursion when serializing
-    private Room room;
+    // Getters and Setters
 }

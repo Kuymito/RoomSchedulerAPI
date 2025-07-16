@@ -1,6 +1,8 @@
 package org.example.roomschedulerapi.classroomscheduler.repository;
 
+import org.apache.ibatis.annotations.Param;
 import org.example.roomschedulerapi.classroomscheduler.model.Class;
+import org.example.roomschedulerapi.classroomscheduler.model.Department;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -27,4 +29,15 @@ public interface ClassRepository extends JpaRepository<Class, Long> {
     List<Class> findByIsArchived(boolean isArchived);
 
     Optional<Class> findByGenerationAndGroupNameAndMajorName(String generation, String groupName, String major);
+
+    boolean existsByClassName(String className);
+
+    boolean existsByDepartmentAndGenerationAndSemester(Department department, String generation, String semester);
+
+    List<Class> findByIsExpired(boolean isExpired);
+
+    @Query("SELECT c FROM Class c WHERE c.isArchived = false AND CAST(c.generation AS integer) <= :archivalYearThreshold")
+    List<Class> findClassesEligibleForArchival(@Param("archivalYearThreshold") int archivalYearThreshold);
+
+    List<Class> findByIsArchivedFalse();
 }

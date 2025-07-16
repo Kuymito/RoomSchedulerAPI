@@ -48,10 +48,11 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
             newRequest.setOriginalSchedule(schedule);
 
             adminMessage = String.format(
-                    "New request from %s %s for class '%s' requires your approval.",
+                    "New request from %s %s for class '%s' to move to room '%s' requires your approval.",
                     instructor.getFirstName(),
                     instructor.getLastName(),
-                    schedule.getAClass().getClassName()
+                    schedule.getAClass().getClassName(),
+                    tempRoom.getRoomName()
             );
             instructorMessage = String.format(
                     "Your request to move class '%s' to room '%s' on %s has been submitted.",
@@ -62,7 +63,7 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
         } else {
             // If scheduleId is null, it's a conference room booking
             adminMessage = String.format(
-                    "New conference room booking request from %s %s for room '%s' on %s.",
+                    "New conference room booking request from %s %s for room '%s' on %s requires your approval.",
                     instructor.getFirstName(),
                     instructor.getLastName(),
                     tempRoom.getRoomName(),
@@ -104,7 +105,7 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
                     "Your request for class '%s' on %s for room %s has been APPROVED.",
                     savedRequest.getOriginalSchedule().getAClass().getClassName(),
                     savedRequest.getEffectiveDate(),
-                    savedRequest.getTemporaryRoom()
+                    savedRequest.getTemporaryRoom().getRoomName() // FIX: Use getRoomName()
             );
         } else {
             message = String.format(
@@ -130,7 +131,7 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
                     "Your request for class '%s' on %s for room %s has been DENIED.",
                     savedRequest.getOriginalSchedule().getAClass().getClassName(),
                     savedRequest.getEffectiveDate(),
-                    savedRequest.getTemporaryRoom()
+                    savedRequest.getTemporaryRoom().getRoomName() // FIX: Use getRoomName()
             );
         } else {
             message = String.format(

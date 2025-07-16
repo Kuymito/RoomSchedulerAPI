@@ -9,9 +9,10 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-// --- Add these annotations for Swagger JWT UI ---
+@EnableScheduling
 @OpenAPIDefinition(
         info = @Info(title = "Room Scheduler API", version = "v1", description = "API documentation for the Room Scheduler application"),
         security = {

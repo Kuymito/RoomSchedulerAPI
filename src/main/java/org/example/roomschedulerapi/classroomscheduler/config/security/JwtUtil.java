@@ -63,6 +63,7 @@ public class JwtUtil {
             // If it has firstName/lastName, use those instead for consistency
             extraClaims.put("firstName", admin.getFirstName());
             extraClaims.put("lastName", ""); // Admins might not have a separate last name
+            extraClaims.put("adminId", admin.getAdminId());
         }
 
         return generateToken(extraClaims, userDetails);

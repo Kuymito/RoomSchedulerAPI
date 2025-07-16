@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import org.example.roomschedulerapi.classroomscheduler.model.*;
 import org.example.roomschedulerapi.classroomscheduler.model.Class;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
-import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
 import org.example.roomschedulerapi.classroomscheduler.exception.ResourceNotFoundException;
 import org.example.roomschedulerapi.classroomscheduler.repository.ChangeRequestRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.ClassRepository;
@@ -29,29 +28,41 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     public List<ScheduleResponseDto> getSchedulesForInstructor(Long instructorId) {
-        // 1. Get all permanent schedules for the instructor.
-        List<Schedule> permanentSchedules = scheduleRepository.findSchedulesByInstructorId(instructorId);
+        // 1. Fetch all classes and create a set of un-archived class IDs.
+        Set<Long> unarchivedClassIds = classRepository.findAll().stream()
+                .filter(c -> !c.isArchived())
+                .map(Class::getClassId)
+                .collect(Collectors.toSet());
 
-        // 2. Find all approved change requests linked to these permanent schedules.
+        // 2. Get all permanent schedules for the instructor, filtering by un-archived classes.
+        List<Schedule> permanentSchedules = scheduleRepository.findSchedulesByInstructorId(instructorId)
+                .stream()
+                .filter(schedule -> unarchivedClassIds.contains(schedule.getAClass().getClassId()))
+                .collect(Collectors.toList());
+
+        // 3. Find all approved change requests linked to these permanent schedules.
         List<ChangeRequest> allOverrides = changeRequestRepository.findActiveApprovedChangesForSchedules(permanentSchedules, LocalDate.now());
 
-        // 3. Create a Set of schedule IDs that have been moved.
+        // 4. Create a Set of schedule IDs that have been moved, ignoring any with null original schedules.
         Set<Long> movedScheduleIds = allOverrides.stream()
+                .filter(cr -> cr.getOriginalSchedule() != null) // FIX: Prevent NullPointerException
                 .map(cr -> cr.getOriginalSchedule().getScheduleId())
                 .collect(Collectors.toSet());
 
         List<ScheduleResponseDto> finalSchedules = new ArrayList<>();
 
-        // 4. Add permanent schedules that have NOT been moved.
+        // 5. Add permanent schedules that have NOT been moved.
         for (Schedule schedule : permanentSchedules) {
             if (!movedScheduleIds.contains(schedule.getScheduleId())) {
                 finalSchedules.add(convertToDtoForInstructor(schedule, instructorId));
             }
         }
 
-        // 5. Add the temporary schedules from the overrides.
+        // 6. Add the temporary schedules from the overrides.
         for (ChangeRequest override : allOverrides) {
-            finalSchedules.add(convertToDtoFromOverride(override.getOriginalSchedule(), instructorId, override));
+            if (override.getOriginalSchedule() != null) { // FIX: Prevent NullPointerException
+                finalSchedules.add(convertToDtoFromOverride(override.getOriginalSchedule(), instructorId, override));
+            }
         }
 
         return finalSchedules;
@@ -61,26 +72,20 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Transactional
     public void swapSchedules(ScheduleSwapDto swapDto) {
         if (swapDto.getScheduleId1().equals(swapDto.getScheduleId2())) {
-            // No need to swap if it's the same schedule
             return;
         }
 
-        // Find both schedules, or throw an exception if not found
         Schedule schedule1 = scheduleRepository.findById(swapDto.getScheduleId1())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", swapDto.getScheduleId1()));
-
         Schedule schedule2 = scheduleRepository.findById(swapDto.getScheduleId2())
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", swapDto.getScheduleId2()));
 
-        // Get the rooms from each schedule
         Room room1 = schedule1.getRoom();
         Room room2 = schedule2.getRoom();
 
-        // Swap the rooms
         schedule1.setRoom(room2);
         schedule2.setRoom(room1);
 
-        // Save both updated schedules to the database
         scheduleRepository.save(schedule1);
         scheduleRepository.save(schedule2);
     }
@@ -88,37 +93,55 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     public List<ScheduleResponseDto> getAllClassesWithScheduleStatus() {
-        // This method now uses the same robust logic.
-        List<Schedule> allPermanentSchedules = scheduleRepository.findAll();
+        Set<Long> unarchivedClassIds = classRepository.findAll().stream()
+                .filter(c -> !c.isArchived())
+                .map(Class::getClassId)
+                .collect(Collectors.toSet());
+
+        List<Schedule> allPermanentSchedules = scheduleRepository.findAll().stream()
+                .filter(schedule -> unarchivedClassIds.contains(schedule.getAClass().getClassId()))
+                .collect(Collectors.toList());
+
         List<ChangeRequest> allOverrides = changeRequestRepository.findAllActiveApprovedChanges(LocalDate.now());
 
         Set<Long> movedScheduleIds = allOverrides.stream()
+                .filter(cr -> cr.getOriginalSchedule() != null)
                 .map(cr -> cr.getOriginalSchedule().getScheduleId())
                 .collect(Collectors.toSet());
 
         List<ScheduleResponseDto> finalSchedules = new ArrayList<>();
 
-        // Add permanent schedules that have not been moved.
         for (Schedule schedule : allPermanentSchedules) {
             if (!movedScheduleIds.contains(schedule.getScheduleId())) {
                 finalSchedules.add(convertToDto(schedule));
             }
         }
 
-        // Add the temporary schedules from the overrides.
         for (ChangeRequest override : allOverrides) {
-            finalSchedules.add(convertToDtoFromOverride(override.getOriginalSchedule(), override));
+            if (override.getOriginalSchedule() != null) {
+                if (unarchivedClassIds.contains(override.getOriginalSchedule().getAClass().getClassId())) {
+                    finalSchedules.add(convertToDtoFromOverride(override.getOriginalSchedule(), override));
+                }
+            } else {
+                finalSchedules.add(convertToDtoFromConferenceRoomBooking(override));
+            }
         }
 
         return finalSchedules;
     }
 
 
-    // --- UNCHANGED PUBLIC METHODS ---
+    // --- UNCHANGED METHODS ---
 
     @Override
     public List<ScheduleResponseDto> getAllSchedules() {
+        Set<Long> unarchivedClassIds = classRepository.findAll().stream()
+                .filter(c -> !c.isArchived())
+                .map(Class::getClassId)
+                .collect(Collectors.toSet());
+
         return scheduleRepository.findAll().stream()
+                .filter(schedule -> unarchivedClassIds.contains(schedule.getAClass().getClassId()))
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
@@ -130,13 +153,16 @@ public class ScheduleServiceImpl implements ScheduleService {
         Room newRoom = roomRepository.findById(newRoomId).orElseThrow(() -> new ResourceNotFoundException("Room", "id", newRoomId));
         schedule.setRoom(newRoom);
         Schedule updatedSchedule = scheduleRepository.save(schedule);
-        return convertToDto(updatedSchedule); // Use manual mapping
+        return convertToDto(updatedSchedule);
     }
 
     @Override
     public Optional<ScheduleResponseDto> getScheduleById(Long scheduleId) {
-        return scheduleRepository.findById(scheduleId).map(this::convertToDto);
+        return scheduleRepository.findById(scheduleId)
+                .filter(schedule -> !schedule.getAClass().isArchived())
+                .map(this::convertToDto);
     }
+
 
     @Transactional
     @Override
@@ -178,19 +204,12 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Transactional
     @Override
     public void unassignRoomFromClass(Long scheduleId) {
-        // First, check if the schedule exists to provide a clear error message.
         if (!scheduleRepository.existsById(scheduleId)) {
             throw new NoSuchElementException("Schedule not found with id: " + scheduleId);
         }
-
-        // --- FIX: Delete all associated change requests FIRST ---
         changeRequestRepository.deleteAllByOriginalSchedule_ScheduleId(scheduleId);
-
-        // Now it is safe to delete the schedule itself.
         scheduleRepository.deleteById(scheduleId);
     }
-
-    // --- PRIVATE HELPER METHODS ---
 
     private ScheduleResponseDto convertToDto(Schedule schedule) {
         Class aClass = schedule.getAClass();
@@ -204,7 +223,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         return new ScheduleResponseDto(
                 schedule.getScheduleId(), aClass.getClassId(), aClass.getClassName(), dayDetails,
                 aClass.getGeneration(), aClass.getSemester(), shiftDto, room.getRoomId(),
-                room.getRoomName(), room.getBuildingName(), aClass.getMajorName()
+                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived(),
+                null // A regular schedule doesn't have a specific event name
         );
     }
 
@@ -222,7 +242,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         return new ScheduleResponseDto(
                 schedule.getScheduleId(), aClass.getClassId(), aClass.getClassName(), dayDetails,
                 aClass.getGeneration(), aClass.getSemester(), shiftDto, room.getRoomId(),
-                room.getRoomName(), room.getBuildingName(), aClass.getMajorName()
+                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived(),
+                null // A regular schedule doesn't have a specific event name
         );
     }
 
@@ -233,7 +254,43 @@ public class ScheduleServiceImpl implements ScheduleService {
         dto.setBuildingName(override.getTemporaryRoom().getBuildingName());
         String newDayOfWeek = override.getEffectiveDate().getDayOfWeek().name();
         dto.getDayDetails().forEach(dd -> dd.setDayOfWeek(newDayOfWeek));
+        // MODIFIED: Set the event name from the change request
+        dto.setEventName(override.getEventName());
         return dto;
+    }
+
+    private ScheduleResponseDto convertToDtoFromConferenceRoomBooking(ChangeRequest changeRequest) {
+        Room room = changeRequest.getTemporaryRoom();
+        Instructor instructor = changeRequest.getRequestingInstructor();
+
+        List<DayDetailDto> dayDetails = new ArrayList<>();
+        dayDetails.add(new DayDetailDto(changeRequest.getEffectiveDate().getDayOfWeek().name(), false, instructor.getFirstName() + " " + instructor.getLastName()));
+
+        // CORRECTED: ShiftResponseDto now correctly uses null for start/end times,
+        // as these fields do not exist on the ChangeRequest entity.
+        ShiftResponseDto shiftDto = new ShiftResponseDto(null, "Booked", null, null, null);
+
+        // Use event name for the class name if available, for a better description
+        String className = (changeRequest.getEventName() != null && !changeRequest.getEventName().isEmpty())
+                ? changeRequest.getEventName()
+                : "Booked by " + instructor.getFirstName() + " " + instructor.getLastName();
+
+        // The rest of the logic to populate the DTO, including the eventName, remains correct.
+        return new ScheduleResponseDto(
+                null,
+                null,
+                className,
+                dayDetails,
+                null,
+                null,
+                shiftDto,
+                room.getRoomId(),
+                room.getRoomName(),
+                room.getBuildingName(),
+                "Conference Room",
+                false,
+                changeRequest.getEventName() // Populate the eventName field
+        );
     }
 
     private ScheduleResponseDto convertToDtoFromOverride(Schedule originalSchedule, Long instructorId, ChangeRequest override) {
@@ -243,6 +300,8 @@ public class ScheduleServiceImpl implements ScheduleService {
         dto.setBuildingName(override.getTemporaryRoom().getBuildingName());
         String newDayOfWeek = override.getEffectiveDate().getDayOfWeek().name();
         dto.getDayDetails().forEach(dd -> dd.setDayOfWeek(newDayOfWeek));
+        // MODIFIED: Set the event name from the change request
+        dto.setEventName(override.getEventName());
         return dto;
     }
 
@@ -257,7 +316,8 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .collect(Collectors.toList());
         return new ScheduleResponseDto(
                 null, aClass.getClassId(), aClass.getClassName(), dayDetails, aClass.getGeneration(),
-                aClass.getSemester(), shiftDto, null, roomName, buildingName, aClass.getMajorName()
+                aClass.getSemester(), shiftDto, null, roomName, buildingName, aClass.getMajorName(), aClass.isArchived(),
+                null // An unscheduled class doesn't have an event name
         );
     }
 }

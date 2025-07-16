@@ -12,4 +12,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findByAdmin_AdminIdOrderByCreatedAtDesc(Long adminId);
 
     List<Notification> findByInstructor_InstructorIdOrderByCreatedAtDesc(Long instructorId);
+
+    boolean existsByChangeRequestIdAndMessage(Long id, String message);
 }

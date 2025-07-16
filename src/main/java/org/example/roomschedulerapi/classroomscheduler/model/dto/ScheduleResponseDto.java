@@ -23,4 +23,6 @@ public class ScheduleResponseDto {
     private String roomName;
     private String buildingName; // Added building for more context
     private String majorName;
+    private boolean isArchived;
+    private String eventName;
 }

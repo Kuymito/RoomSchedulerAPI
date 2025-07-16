@@ -1,5 +1,6 @@
 package org.example.roomschedulerapi.classroomscheduler.service.impl;
 
+import org.example.roomschedulerapi.classroomscheduler.exception.DuplicateResourceException;
 import org.example.roomschedulerapi.classroomscheduler.exception.InstructorConflictException; // Import the custom exception
 import org.example.roomschedulerapi.classroomscheduler.model.*;
 import org.example.roomschedulerapi.classroomscheduler.model.Class; // Explicit import
@@ -12,11 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -117,6 +114,10 @@ public class ClassServiceImpl implements ClassService {
                 dto.getGroupName(),
                 dto.getMajor()
         );
+        if (classRepository.existsByClassName(dto.getClassName())) {
+            throw new DuplicateResourceException("A class with the name '" + dto.getClassName() + "' already exists.");
+        }
+
 
         if (existingClass.isPresent()) {
             throw new DataIntegrityViolationException(
@@ -172,6 +173,15 @@ public class ClassServiceImpl implements ClassService {
         Class updatedClass = classRepository.save(existingClass);
         return convertToDto(updatedClass);
     }
+
+    @Override
+    public List<ClassResponseDto> getClassesByExpirationStatus(boolean isExpired) {
+        List<Class> classes = classRepository.findByIsExpired(isExpired);
+        return classes.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
 
     @Override
     @Transactional

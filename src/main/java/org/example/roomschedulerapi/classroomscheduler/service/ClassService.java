@@ -28,4 +28,6 @@ public interface ClassService {
     List<ClassResponseDto> getClassesForAuthenticatedInstructor(String instructorEmail);
 
     ClassResponseDto unassignInstructor(UnassignInstructorDto unassignInstructorDto);
+
+    List<ClassResponseDto> getClassesByExpirationStatus(boolean isExpired);
 }

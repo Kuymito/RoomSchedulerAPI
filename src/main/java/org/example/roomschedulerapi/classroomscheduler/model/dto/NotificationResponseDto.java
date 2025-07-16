@@ -15,4 +15,5 @@ public class NotificationResponseDto {
     private OffsetDateTime createdAt;
     private RequestStatus status;
     private String profile;
+    private String description;
 }

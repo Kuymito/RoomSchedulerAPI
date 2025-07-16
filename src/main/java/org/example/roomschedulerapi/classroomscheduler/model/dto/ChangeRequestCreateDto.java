@@ -10,4 +10,5 @@ public class ChangeRequestCreateDto {
     private Long newRoomId;
     private LocalDate effectiveDate;
     private String description;
+    private String eventName;
 }

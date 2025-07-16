@@ -58,7 +58,7 @@ public class RoomController {
     public ResponseEntity<ApiResponse<Room>> patchRoom(@PathVariable Long roomId, @RequestBody RoomUpdateDto roomUpdateDto) {
         try {
             Room patchedRoom = roomService.patchRoom(roomId, roomUpdateDto);
-            return ResponseEntity.ok(new ApiResponse<>("Room updated successfully", patchedRoom, HttpStatus.OK, LocalDateTime.now()));
+            return ResponseEntity.ok(new ApiResponse<>("Room updated successfully", null, HttpStatus.OK, LocalDateTime.now()));
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiResponse<>(e.getMessage(), null, HttpStatus.NOT_FOUND, LocalDateTime.now()));
         } catch (Exception e) {

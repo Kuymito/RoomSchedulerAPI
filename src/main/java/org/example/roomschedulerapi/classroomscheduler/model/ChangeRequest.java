@@ -41,6 +41,9 @@ public class ChangeRequest {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "event_name")
+    private String eventName;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private RequestStatus status;
