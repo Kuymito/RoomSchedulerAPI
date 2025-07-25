@@ -2,7 +2,9 @@ package org.example.roomschedulerapi.classroomscheduler.repository;
 
 import org.apache.ibatis.annotations.Param;
 import org.example.roomschedulerapi.classroomscheduler.model.ChangeRequest; // Assuming you have this model
+import org.example.roomschedulerapi.classroomscheduler.model.Room;
 import org.example.roomschedulerapi.classroomscheduler.model.Schedule;
+import org.example.roomschedulerapi.classroomscheduler.model.Shift;
 import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -40,4 +42,11 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
 
     @Query("SELECT cr FROM ChangeRequest cr WHERE cr.status = 'APPROVED' AND cr.effectiveDate >= :currentDate")
     List<ChangeRequest> findAllActiveApprovedChanges(@Param("currentDate") LocalDate currentDate);
+
+    boolean existsByTemporaryRoomAndEffectiveDateAndShiftAndStatusIn(
+            Room temporaryRoom,
+            LocalDate effectiveDate,
+            Shift shift,
+            List<RequestStatus> statuses
+    );
 }

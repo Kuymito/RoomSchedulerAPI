@@ -8,6 +8,7 @@ public class ChangeRequestCreateDto {
     // The instructorId field is removed from here
     private Long scheduleId;
     private Long newRoomId;
+    private Long shiftId;
     private LocalDate effectiveDate;
     private String description;
     private String eventName;

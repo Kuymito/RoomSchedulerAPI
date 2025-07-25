@@ -73,7 +73,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/change-requests").hasAnyRole("ADMIN", "INSTRUCTOR")
 
                         // Rule for fetching all requests (for Admin dashboard)
-                        .requestMatchers(HttpMethod.GET, "/api/v1/change-requests").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/v1/change-requests").hasAnyRole("ADMIN", "INSTRUCTOR")
 
                         // Rule for notifications
                         .requestMatchers("/api/v1/notifications/**").hasAnyRole("ADMIN", "INSTRUCTOR")

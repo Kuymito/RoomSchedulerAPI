@@ -7,6 +7,7 @@ import org.example.roomschedulerapi.classroomscheduler.model.Role;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.InstructorCreateDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.InstructorResponseDto;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.InstructorUpdateDto;
+import org.example.roomschedulerapi.classroomscheduler.repository.AdminRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.DepartmentRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.InstructorRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.RoleRepository;
@@ -30,6 +31,7 @@ public class InstructorServiceImpl implements InstructorService {
     // RoleRepository and PasswordEncoder are no longer needed for patching but may be used elsewhere
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AdminRepository adminRepository;
 
 
     // ... (convertToDto and other methods remain the same)
@@ -73,6 +75,9 @@ public class InstructorServiceImpl implements InstructorService {
     @Transactional
     public InstructorResponseDto createInstructor(InstructorCreateDto dto) {
         // Check if email already exists
+        if (adminRepository.findByEmail(dto.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Email already in use by an admin.");
+        }
         instructorRepository.findByEmail(dto.getEmail()).ifPresent(existingInstructor -> {
             throw new IllegalArgumentException("Email already in use: " + dto.getEmail());
         });

@@ -13,6 +13,7 @@ public class ChangeRequestResponseDto {
     private String requestingInstructorName;
     private String originalRoomName;
     private String temporaryRoomName;
+    private String shiftName;
     private RequestStatus status;
     private LocalDate effectiveDate;
     private OffsetDateTime requestedAt;

@@ -6,6 +6,7 @@ import org.example.roomschedulerapi.classroomscheduler.model.DaysOfWeek;
 import org.example.roomschedulerapi.classroomscheduler.model.Schedule;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.DetailedScheduleDto; // Make sure to import
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param; // Make sure to import
 import org.springframework.stereotype.Repository;
@@ -82,4 +83,8 @@ public interface ScheduleRepository extends JpaRepository<Schedule, Long> {
 
     @Query("SELECT cr FROM ChangeRequest cr JOIN FETCH cr.originalSchedule")
     List<ChangeRequest> findAllWithSchedules();
+
+    @Modifying
+    @Query("DELETE FROM Schedule s WHERE s.aClass = :classToDelete")
+    void deleteAllByAClass(@Param("classToDelete") Class classToDelete);
 }

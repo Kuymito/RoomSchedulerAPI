@@ -23,12 +23,39 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
     private final ScheduleRepository scheduleRepository;
     private final InstructorRepository instructorRepository;
     private final RoomRepository roomRepository;
+    private final ShiftRepository shiftRepository;
     private final NotificationService notificationService;
 
     @Override
     public ChangeRequestResponseDto createChangeRequest(ChangeRequestCreateDto requestDto, Instructor instructor) {
         Room tempRoom = roomRepository.findById(requestDto.getNewRoomId())
                 .orElseThrow(() -> new NoSuchElementException("Temporary room not found with id: " + requestDto.getNewRoomId()));
+
+        Shift shift = null;
+        if (requestDto.getShiftId() != null) {
+            shift = shiftRepository.findById(requestDto.getShiftId())
+                    .orElseThrow(() -> new NoSuchElementException("Shift not found with id: " + requestDto.getShiftId()));
+        }
+
+        // --- VALIDATION LOGIC ---
+        // Check for overlapping requests before creating a new one.
+        if (shift != null) {
+            List<RequestStatus> conflictingStatuses = List.of(RequestStatus.PENDING, RequestStatus.APPROVED);
+            boolean isOverlapping = changeRequestRepository.existsByTemporaryRoomAndEffectiveDateAndShiftAndStatusIn(
+                    tempRoom,
+                    requestDto.getEffectiveDate(),
+                    shift,
+                    conflictingStatuses
+            );
+
+            if (isOverlapping) {
+                // ✨ ENHANCED MESSAGE: Provide a clear message if a request already exists.
+                // The exception stops execution, so no new request is saved and no notification is sent.
+                throw new IllegalStateException(
+                        "This request cannot be submitted because a conflicting request for the same room, date, and time shift already exists."
+                );
+            }
+        }
 
         ChangeRequest newRequest = new ChangeRequest();
         newRequest.setRequestingInstructor(instructor);
@@ -37,6 +64,7 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
         newRequest.setDescription(requestDto.getDescription());
         newRequest.setStatus(RequestStatus.PENDING);
         newRequest.setRequestedAt(OffsetDateTime.now());
+        newRequest.setShift(shift);
 
         String adminMessage;
         String instructorMessage;
@@ -79,6 +107,7 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
         ChangeRequest savedRequest = changeRequestRepository.save(newRequest);
 
         // --- NOTIFICATION LOGIC ---
+        // This code is only reached if the validation above passes.
         notificationService.createNotificationForAdmins(savedRequest, adminMessage);
         notificationService.createNotificationForInstructor(instructor.getInstructorId(), savedRequest, instructorMessage);
 
@@ -159,6 +188,10 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
         dto.setRequestedAt(request.getRequestedAt());
         dto.setRequestingInstructorName(request.getRequestingInstructor().getFirstName() + " " + request.getRequestingInstructor().getLastName());
         dto.setTemporaryRoomName(request.getTemporaryRoom().getRoomName());
+
+        if (request.getShift() != null) {
+            dto.setShiftName(request.getShift().getName());
+        }
 
         if (request.getOriginalSchedule() != null) {
             dto.setScheduleId(request.getOriginalSchedule().getScheduleId());

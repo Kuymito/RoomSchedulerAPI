@@ -24,14 +24,16 @@ public class ClassServiceImpl implements ClassService {
     private final DepartmentRepository departmentRepository;
     private final ShiftRepository shiftRepository;
     private final ClassInstructorRepository classInstructorRepository;
+    private final ScheduleRepository scheduleRepository;
 
     @Autowired
-    public ClassServiceImpl(ClassRepository classRepository, InstructorRepository instructorRepository, DepartmentRepository departmentRepository, ShiftRepository shiftRepository, ClassInstructorRepository classInstructorRepository) {
+    public ClassServiceImpl(ClassRepository classRepository, InstructorRepository instructorRepository, DepartmentRepository departmentRepository, ShiftRepository shiftRepository, ClassInstructorRepository classInstructorRepository, ScheduleRepository scheduleRepository) {
         this.classRepository = classRepository;
         this.instructorRepository = instructorRepository;
         this.departmentRepository = departmentRepository;
         this.shiftRepository = shiftRepository;
         this.classInstructorRepository = classInstructorRepository;
+        this.scheduleRepository = scheduleRepository;
     }
 
     /**
@@ -118,6 +120,8 @@ public class ClassServiceImpl implements ClassService {
             throw new DuplicateResourceException("A class with the name '" + dto.getClassName() + "' already exists.");
         }
 
+        checkForDuplicateClass(dto, null);
+
 
         if (existingClass.isPresent()) {
             throw new DataIntegrityViolationException(
@@ -202,13 +206,56 @@ public class ClassServiceImpl implements ClassService {
             Department department = departmentRepository.findById(dto.getDepartmentId()).orElseThrow(() -> new NoSuchElementException("Department not found"));
             aClass.setDepartment(department);
         }
-        if (dto.getShiftId() != null) {
-            Shift shift = shiftRepository.findById(dto.getShiftId()).orElseThrow(() -> new NoSuchElementException("Shift not found"));
-            aClass.setShift(shift);
+        if (dto.getShiftId() != null && !dto.getShiftId().equals(aClass.getShift().getShiftId())) {
+            Shift newShift = shiftRepository.findById(dto.getShiftId())
+                    .orElseThrow(() -> new NoSuchElementException("Shift not found with id: " + dto.getShiftId()));
+
+            // Perform instructor conflict check
+            for (ClassInstructor ci : aClass.getClassInstructors()) {
+                checkForInstructorConflict(ci.getInstructor(), ci.getDayOfWeek(), newShift, aClass.getClassId());
+            }
+
+            // Update the shift
+            aClass.setShift(newShift);
+
+            // ✨ 4. NEW: Delete all existing schedule entries for this class.
+            // This is the safest way to prevent room conflicts when a shift changes.
+            scheduleRepository.deleteAllByAClass(aClass);
+
+            // Handle un-assigning instructors based on the new shift type
+            List<ClassInstructor> instructorsToRemove = new ArrayList<>();
+            if ("Weekend".equalsIgnoreCase(newShift.getScheduleType())) {
+                instructorsToRemove = aClass.getClassInstructors().stream()
+                        .filter(ci -> ci.getDayOfWeek() != DaysOfWeek.SATURDAY && ci.getDayOfWeek() != DaysOfWeek.SUNDAY)
+                        .collect(Collectors.toList());
+            } else if ("Weekday".equalsIgnoreCase(newShift.getScheduleType())) {
+                instructorsToRemove = aClass.getClassInstructors().stream()
+                        .filter(ci -> ci.getDayOfWeek() == DaysOfWeek.SATURDAY || ci.getDayOfWeek() == DaysOfWeek.SUNDAY)
+                        .collect(Collectors.toList());
+            }
+
+            if (!instructorsToRemove.isEmpty()) {
+                aClass.getClassInstructors().removeAll(instructorsToRemove);
+                classInstructorRepository.deleteAll(instructorsToRemove);
+            }
         }
 
         Class patchedClass = classRepository.save(aClass);
         return convertToDto(patchedClass);
+    }
+
+    private void checkForInstructorConflict(Instructor instructor, DaysOfWeek day, Shift shift, Long classToExcludeId) {
+        // This helper method is still recommended to avoid duplicate logic
+        List<ClassInstructor> instructorAssignments = classInstructorRepository.findByInstructor(instructor);
+        for (ClassInstructor assignment : instructorAssignments) {
+            if (!assignment.getAClass().getClassId().equals(classToExcludeId) &&
+                    assignment.getDayOfWeek().equals(day) &&
+                    assignment.getAClass().getShift().getShiftId().equals(shift.getShiftId())) {
+                throw new InstructorConflictException(
+                        "Conflict: Instructor " + instructor.getFirstName() + " is already scheduled for another class at this time."
+                );
+            }
+        }
     }
 
     @Override
@@ -239,6 +286,11 @@ public class ClassServiceImpl implements ClassService {
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + assignInstructorDto.getClassId()));
         Instructor instructorToAssign = instructorRepository.findById(assignInstructorDto.getInstructorId())
                 .orElseThrow(() -> new NoSuchElementException("Instructor not found with id: " + assignInstructorDto.getInstructorId()));
+
+        // Check if the instructor is archived
+        if (instructorToAssign.isArchived()) {
+            throw new IllegalArgumentException("Cannot assign an archived instructor.");
+        }
 
         DaysOfWeek dayToAssign = DaysOfWeek.valueOf(assignInstructorDto.getDayOfWeek().toUpperCase());
         Shift classShift = existingClass.getShift();
@@ -338,5 +390,59 @@ public class ClassServiceImpl implements ClassService {
                 .collect(Collectors.toList());
 
         return classes.stream().map(this::convertToDto).collect(Collectors.toList());
+    }
+
+    private void checkForDuplicateClass(ClassCreateDto dto, Long classIdToExclude) {
+        Optional<Class> existingClass = classRepository.findByGenerationAndGroupNameAndMajorName(
+                dto.getGeneration(),
+                dto.getGroupName(),
+                dto.getMajor()
+        );
+
+        if (existingClass.isPresent() && !existingClass.get().getClassId().equals(classIdToExclude)) {
+            throw new DuplicateResourceException(
+                    "A class with the same generation, group, and major already exists."
+            );
+        }
+    }
+
+    @Override
+    @Transactional
+    public ClassResponseDto swapInstructorsInClass(SwapInstructorsInClassDto dto) {
+        // 1. Fetch both assignments from the same class
+        ClassInstructor fromAssignment = findClassInstructor(dto.getClassId(), dto.getFromDayOfWeek());
+        ClassInstructor toAssignment = findClassInstructor(dto.getClassId(), dto.getToDayOfWeek());
+
+        // 2. Get the instructors to be swapped
+        Instructor fromInstructor = fromAssignment.getInstructor();
+        Instructor toInstructor = toAssignment.getInstructor();
+
+        // 3. Prevent swapping the same assignment
+        if (dto.getFromDayOfWeek().equalsIgnoreCase(dto.getToDayOfWeek())) {
+            throw new IllegalArgumentException("Cannot swap an assignment with itself.");
+        }
+
+        // 4. Perform the swap
+        fromAssignment.setInstructor(toInstructor);
+        toAssignment.setInstructor(fromInstructor);
+
+        // 5. Save the updated assignments
+        classInstructorRepository.save(fromAssignment);
+        classInstructorRepository.save(toAssignment);
+
+        // 6. Fetch the updated class to return its DTO
+        Class updatedClass = classRepository.findById(dto.getClassId())
+                .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + dto.getClassId()));
+
+        return convertToDto(updatedClass);
+    }
+
+    /**
+     * Helper method to find a ClassInstructor assignment.
+     */
+    private ClassInstructor findClassInstructor(Long classId, String day) {
+        DaysOfWeek dayOfWeek = DaysOfWeek.valueOf(day.toUpperCase());
+        return classInstructorRepository.findByaClass_ClassIdAndDayOfWeek(classId, dayOfWeek)
+                .orElseThrow(() -> new NoSuchElementException("No assignment found for class " + classId + " on " + day));
     }
 }

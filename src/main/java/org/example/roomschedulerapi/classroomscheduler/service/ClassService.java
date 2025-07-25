@@ -30,4 +30,6 @@ public interface ClassService {
     ClassResponseDto unassignInstructor(UnassignInstructorDto unassignInstructorDto);
 
     List<ClassResponseDto> getClassesByExpirationStatus(boolean isExpired);
+
+    ClassResponseDto swapInstructorsInClass(SwapInstructorsInClassDto dto);
 }

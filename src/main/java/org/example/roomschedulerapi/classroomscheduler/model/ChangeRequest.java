@@ -27,6 +27,10 @@ public class ChangeRequest {
     @JoinColumn(name = "instructor_id")
     private Instructor requestingInstructor;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "shift_id", nullable = true)
+    private Shift shift;
+
     @OneToMany(
             mappedBy = "changeRequest",
             cascade = CascadeType.ALL,
