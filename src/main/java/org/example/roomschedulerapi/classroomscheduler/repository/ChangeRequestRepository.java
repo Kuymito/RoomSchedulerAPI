@@ -1,5 +1,6 @@
 package org.example.roomschedulerapi.classroomscheduler.repository;
 
+import jakarta.transaction.Transactional;
 import org.apache.ibatis.annotations.Param;
 import org.example.roomschedulerapi.classroomscheduler.model.ChangeRequest; // Assuming you have this model
 import org.example.roomschedulerapi.classroomscheduler.model.Room;
@@ -7,6 +8,7 @@ import org.example.roomschedulerapi.classroomscheduler.model.Schedule;
 import org.example.roomschedulerapi.classroomscheduler.model.Shift;
 import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -49,4 +51,10 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
             Shift shift,
             List<RequestStatus> statuses
     );
+
+    @Transactional
+    @Modifying
+    long deleteByOriginalSchedule_ScheduleId(Long scheduleId);
+
+    List<ChangeRequest> findAllByOriginalSchedule_ScheduleId(Long scheduleId);
 }

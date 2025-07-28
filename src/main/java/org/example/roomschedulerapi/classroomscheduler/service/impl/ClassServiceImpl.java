@@ -409,31 +409,49 @@ public class ClassServiceImpl implements ClassService {
     @Override
     @Transactional
     public ClassResponseDto swapInstructorsInClass(SwapInstructorsInClassDto dto) {
-        // 1. Fetch both assignments from the same class
-        ClassInstructor fromAssignment = findClassInstructor(dto.getClassId(), dto.getFromDayOfWeek());
-        ClassInstructor toAssignment = findClassInstructor(dto.getClassId(), dto.getToDayOfWeek());
-
-        // 2. Get the instructors to be swapped
-        Instructor fromInstructor = fromAssignment.getInstructor();
-        Instructor toInstructor = toAssignment.getInstructor();
-
-        // 3. Prevent swapping the same assignment
         if (dto.getFromDayOfWeek().equalsIgnoreCase(dto.getToDayOfWeek())) {
             throw new IllegalArgumentException("Cannot swap an assignment with itself.");
         }
 
-        // 4. Perform the swap
-        fromAssignment.setInstructor(toInstructor);
-        toAssignment.setInstructor(fromInstructor);
+        DaysOfWeek fromDay = DaysOfWeek.valueOf(dto.getFromDayOfWeek().toUpperCase());
+        DaysOfWeek toDay = DaysOfWeek.valueOf(dto.getToDayOfWeek().toUpperCase());
 
-        // 5. Save the updated assignments
-        classInstructorRepository.save(fromAssignment);
-        classInstructorRepository.save(toAssignment);
+        // Use Optional to handle cases where a day might be unassigned
+        Optional<ClassInstructor> fromAssignmentOpt = classInstructorRepository.findByaClass_ClassIdAndDayOfWeek(dto.getClassId(), fromDay);
+        Optional<ClassInstructor> toAssignmentOpt = classInstructorRepository.findByaClass_ClassIdAndDayOfWeek(dto.getClassId(), toDay);
 
-        // 6. Fetch the updated class to return its DTO
+        // Case 1: Swapping two assigned instructors
+        if (fromAssignmentOpt.isPresent() && toAssignmentOpt.isPresent()) {
+            ClassInstructor fromAssignment = fromAssignmentOpt.get();
+            ClassInstructor toAssignment = toAssignmentOpt.get();
+
+            Instructor tempInstructor = fromAssignment.getInstructor();
+            fromAssignment.setInstructor(toAssignment.getInstructor());
+            toAssignment.setInstructor(tempInstructor);
+
+            classInstructorRepository.save(fromAssignment);
+            classInstructorRepository.save(toAssignment);
+        }
+        // Case 2: Moving an assigned instructor to an unassigned day
+        else if (fromAssignmentOpt.isPresent() && toAssignmentOpt.isEmpty()) {
+            ClassInstructor fromAssignment = fromAssignmentOpt.get();
+            fromAssignment.setDayOfWeek(toDay); // Move the assignment to the new day
+            classInstructorRepository.save(fromAssignment);
+        }
+        // Case 3: Moving an instructor from an unassigned day to an assigned day
+        else if (fromAssignmentOpt.isEmpty() && toAssignmentOpt.isPresent()) {
+            ClassInstructor toAssignment = toAssignmentOpt.get();
+            toAssignment.setDayOfWeek(fromDay); // Move the assignment to the new day
+            classInstructorRepository.save(toAssignment);
+        }
+        // Case 4: Both days are unassigned
+        else {
+            throw new NoSuchElementException("Cannot perform swap: both days are unassigned.");
+        }
+
+        // Fetch and return the updated class details
         Class updatedClass = classRepository.findById(dto.getClassId())
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + dto.getClassId()));
-
         return convertToDto(updatedClass);
     }
 
@@ -444,5 +462,50 @@ public class ClassServiceImpl implements ClassService {
         DaysOfWeek dayOfWeek = DaysOfWeek.valueOf(day.toUpperCase());
         return classInstructorRepository.findByaClass_ClassIdAndDayOfWeek(classId, dayOfWeek)
                 .orElseThrow(() -> new NoSuchElementException("No assignment found for class " + classId + " on " + day));
+    }
+
+    @Override
+    @Transactional
+    public ClassResponseDto replaceInstructor(ReplaceInstructorDto dto) {
+        // 1. Find the existing assignment that needs to be changed.
+        DaysOfWeek day = DaysOfWeek.valueOf(dto.getDayOfWeek().toUpperCase());
+        ClassInstructor assignmentToUpdate = classInstructorRepository
+                .findByaClass_ClassIdAndDayOfWeek(dto.getClassId(), day)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "No instructor is assigned to this class on " + dto.getDayOfWeek()
+                ));
+
+        // 2. Find the new instructor to be assigned.
+        Instructor newInstructor = instructorRepository.findById(dto.getNewInstructorId())
+                .orElseThrow(() -> new NoSuchElementException(
+                        "The new instructor with ID " + dto.getNewInstructorId() + " was not found."
+                ));
+
+        // 3. Perform validations on the new instructor.
+        if (newInstructor.isArchived()) {
+            throw new IllegalArgumentException("Cannot assign an archived instructor.");
+        }
+
+        // Prevent assigning the same instructor.
+        if (assignmentToUpdate.getInstructor().getInstructorId().equals(newInstructor.getInstructorId())) {
+            throw new IllegalArgumentException("The new instructor is already assigned to this day.");
+        }
+
+        // Check if the new instructor has any time conflicts.
+        checkForInstructorConflict(
+                newInstructor,
+                assignmentToUpdate.getDayOfWeek(),
+                assignmentToUpdate.getAClass().getShift(),
+                null // Pass null because we are checking for conflicts across ALL classes.
+        );
+
+        // 4. Replace the instructor and save the change.
+        assignmentToUpdate.setInstructor(newInstructor);
+        classInstructorRepository.save(assignmentToUpdate);
+
+        // 5. Return the updated class details.
+        Class updatedClass = classRepository.findById(dto.getClassId())
+                .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + dto.getClassId()));
+        return convertToDto(updatedClass);
     }
 }

@@ -11,6 +11,7 @@ import org.example.roomschedulerapi.classroomscheduler.service.NotificationServi
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -49,8 +50,6 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
             );
 
             if (isOverlapping) {
-                // ✨ ENHANCED MESSAGE: Provide a clear message if a request already exists.
-                // The exception stops execution, so no new request is saved and no notification is sent.
                 throw new IllegalStateException(
                         "This request cannot be submitted because a conflicting request for the same room, date, and time shift already exists."
                 );
@@ -69,45 +68,55 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
         String adminMessage;
         String instructorMessage;
 
+        // Formatter for a more readable date
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+        String formattedDate = newRequest.getEffectiveDate().format(dateFormatter);
+
         // If scheduleId is provided, it's a class change request
         if (requestDto.getScheduleId() != null) {
             Schedule schedule = scheduleRepository.findById(requestDto.getScheduleId())
                     .orElseThrow(() -> new NoSuchElementException("Schedule not found with id: " + requestDto.getScheduleId()));
             newRequest.setOriginalSchedule(schedule);
 
+            // UPDATED ADMIN MESSAGE
             adminMessage = String.format(
-                    "New request from %s %s for class '%s' to move to room '%s' requires your approval.",
+                    "Request from %s %s: Move class '%s' to room '%s' on %s (%s).",
                     instructor.getFirstName(),
                     instructor.getLastName(),
                     schedule.getAClass().getClassName(),
-                    tempRoom.getRoomName()
+                    tempRoom.getRoomName(),
+                    formattedDate,
+                    shift != null ? shift.getName() : "N/A"
             );
+
             instructorMessage = String.format(
                     "Your request to move class '%s' to room '%s' on %s has been submitted.",
                     schedule.getAClass().getClassName(),
                     tempRoom.getRoomName(),
-                    newRequest.getEffectiveDate()
+                    formattedDate
             );
         } else {
             // If scheduleId is null, it's a conference room booking
+            // UPDATED ADMIN MESSAGE
             adminMessage = String.format(
-                    "New conference room booking request from %s %s for room '%s' on %s requires your approval.",
+                    "Booking request from %s %s: Room '%s' on %s (%s).",
                     instructor.getFirstName(),
                     instructor.getLastName(),
                     tempRoom.getRoomName(),
-                    newRequest.getEffectiveDate()
+                    formattedDate,
+                    shift != null ? shift.getName() : "N/A"
             );
+
             instructorMessage = String.format(
                     "Your request to book conference room '%s' on %s has been submitted.",
                     tempRoom.getRoomName(),
-                    newRequest.getEffectiveDate()
+                    formattedDate
             );
         }
 
         ChangeRequest savedRequest = changeRequestRepository.save(newRequest);
 
         // --- NOTIFICATION LOGIC ---
-        // This code is only reached if the validation above passes.
         notificationService.createNotificationForAdmins(savedRequest, adminMessage);
         notificationService.createNotificationForInstructor(instructor.getInstructorId(), savedRequest, instructorMessage);
 

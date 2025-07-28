@@ -32,4 +32,6 @@ public interface ClassService {
     List<ClassResponseDto> getClassesByExpirationStatus(boolean isExpired);
 
     ClassResponseDto swapInstructorsInClass(SwapInstructorsInClassDto dto);
+
+    ClassResponseDto replaceInstructor(ReplaceInstructorDto dto);
 }

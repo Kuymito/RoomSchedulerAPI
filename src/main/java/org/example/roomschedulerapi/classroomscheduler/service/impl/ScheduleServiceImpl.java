@@ -5,15 +5,22 @@ import org.example.roomschedulerapi.classroomscheduler.model.*;
 import org.example.roomschedulerapi.classroomscheduler.model.Class;
 import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
 import org.example.roomschedulerapi.classroomscheduler.exception.ResourceNotFoundException;
+import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
 import org.example.roomschedulerapi.classroomscheduler.repository.ChangeRequestRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.ClassRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.RoomRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.ScheduleRepository;
 import org.example.roomschedulerapi.classroomscheduler.service.ScheduleService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -319,4 +326,33 @@ public class ScheduleServiceImpl implements ScheduleService {
                 null, null, null, null // EventName and temporary fields are null for an unscheduled class
         );
     }
+
+    @Override
+    @Transactional
+    public ScheduleResponseDto revertTemporaryMove(Long scheduleId) {
+        // 1. Ensure the original schedule actually exists
+        Schedule originalSchedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", scheduleId));
+
+        // 2. Find all active change requests linked to this original schedule
+        List<ChangeRequest> changeRequests = changeRequestRepository.findAllByOriginalSchedule_ScheduleId(scheduleId);
+
+        if (changeRequests.isEmpty()) {
+            System.out.println("No active change request found to revert for schedule ID: " + scheduleId);
+        } else {
+            // 3. Update the status of each found request to DENIED
+            for (ChangeRequest request : changeRequests) {
+                // We only deny pending or approved requests. A denied request should not be re-denied.
+                if (request.getStatus() == RequestStatus.PENDING || request.getStatus() == RequestStatus.APPROVED) {
+                    request.setStatus(RequestStatus.DENIED);
+                }
+            }
+            // 4. Save the updated requests back to the database
+            changeRequestRepository.saveAll(changeRequests);
+        }
+
+        // 5. Return the original schedule's DTO, which is now the active one.
+        return convertToDto(originalSchedule);
+    }
+
 }

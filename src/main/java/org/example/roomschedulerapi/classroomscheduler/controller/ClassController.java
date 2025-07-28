@@ -175,4 +175,17 @@
             classes = classService.getClassesByExpirationStatus(expired);
             return ResponseEntity.ok(new ApiResponse<>("Classes retrieved successfully.", classes, HttpStatus.OK, LocalDateTime.now()));
         }
+
+        @PostMapping("/swap-instructors-in-class")
+        public ResponseEntity<ClassResponseDto> swapInstructorsInClass(@RequestBody SwapInstructorsInClassDto dto) {
+            ClassResponseDto updatedClass = classService.swapInstructorsInClass(dto);
+            return ResponseEntity.ok(updatedClass);
+        }
+
+        @PostMapping("/replace-instructor")
+        public ResponseEntity<ClassResponseDto> replaceInstructor(@RequestBody ReplaceInstructorDto dto) {
+            ClassResponseDto updatedClass = classService.replaceInstructor(dto);
+            return ResponseEntity.ok(updatedClass);
+        }
+
     }

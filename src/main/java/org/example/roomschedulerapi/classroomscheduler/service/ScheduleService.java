@@ -19,4 +19,5 @@ public interface ScheduleService {
     List<ScheduleResponseDto> getAllClassesWithScheduleStatus();
     void swapSchedules(ScheduleSwapDto swapDto);
     ScheduleResponseDto moveSchedule(Long scheduleId, Long newRoomId);
+    ScheduleResponseDto revertTemporaryMove(Long scheduleId);
 }

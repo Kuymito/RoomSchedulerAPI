@@ -155,4 +155,19 @@ public class ScheduleController {
         }
     }
 
+    @PatchMapping("/{scheduleId}/revert-temporary")
+    @PreAuthorize("hasRole('ADMIN')") // Secure the endpoint
+    public ResponseEntity<ApiResponse<ScheduleResponseDto>> revertTemporaryMove(@PathVariable Long scheduleId) {
+        ScheduleResponseDto updatedSchedule = scheduleService.revertTemporaryMove(scheduleId);
+
+        ApiResponse<ScheduleResponseDto> response = new ApiResponse<>(
+                "Temporary room assignment has been reverted successfully.",
+                updatedSchedule,
+                HttpStatus.ACCEPTED,
+                LocalDateTime.now()
+        );
+
+        return ResponseEntity.ok(response);
+    }
+
 }
