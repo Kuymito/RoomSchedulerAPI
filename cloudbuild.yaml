@@ -1,0 +1,25 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/room-scheduler-api:$COMMIT_SHA', '.']
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/room-scheduler-api:$COMMIT_SHA']
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'room-scheduler-api' # a name for your service
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/room-scheduler-api:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1' # choose a region close to your users
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--add-cloudsql-instances'
+      - '<YOUR_CONNECTION_NAME>' # paste your connection name here
+images:
+  - 'gcr.io/$PROJECT_ID/room-scheduler-api:$COMMIT_SHA'
