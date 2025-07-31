@@ -98,18 +98,18 @@ public class RoomServiceImpl implements RoomService {
         dto.setType(room.getType());
         dto.setEquipment(room.getEquipment());
 
-        List<RoomScheduleDto.DailyAvailabilityDto> dailyDtos = room.getAvailability()
-                .stream()
-                .map(avail -> {
-                    RoomScheduleDto.DailyAvailabilityDto dailyDto = new RoomScheduleDto.DailyAvailabilityDto();
-                    dailyDto.setDayOfWeek(avail.getDayOfWeek());
-                    // Updated Logic: Availability now only depends on whether the room is scheduled.
-                    dailyDto.setAvailable(!scheduledDays.contains(avail.getDayOfWeek().toUpperCase()));
-                    return dailyDto;
-                })
-                .toList();
-
-        dto.setAvailability(dailyDtos);
+//        List<RoomScheduleDto.DailyAvailabilityDto> dailyDtos = room.getAvailability()
+//                .stream()
+//                .map(avail -> {
+//                    RoomScheduleDto.DailyAvailabilityDto dailyDto = new RoomScheduleDto.DailyAvailabilityDto();
+//                    dailyDto.setDayOfWeek(avail.getDayOfWeek());
+//                    // Updated Logic: Availability now only depends on whether the room is scheduled.
+//                    dailyDto.setAvailable(!scheduledDays.contains(avail.getDayOfWeek().toUpperCase()));
+//                    return dailyDto;
+//                })
+//                .toList();
+//
+//        dto.setAvailability(dailyDtos);
 
         return dto;
     }

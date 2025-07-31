@@ -9,6 +9,9 @@ WORKDIR /app
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
+# ---- FIX: Add execute permission to the Maven wrapper ----
+RUN chmod +x ./mvnw
+
 # Download dependencies. This is done as a separate step to leverage Docker's layer caching.
 RUN ./mvnw dependency:go-offline
 
