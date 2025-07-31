@@ -1,6 +1,6 @@
 # Stage 1: Build the application with Maven
-# We use a specific Maven image that includes the JDK
-FROM maven:3.8.5-openjdk-17 AS build
+# Use a Maven image that includes OpenJDK 21 to match the project's requirement
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
-# ---- FIX: Add execute permission to the Maven wrapper ----
+# Add execute permission to the Maven wrapper
 RUN chmod +x ./mvnw
 
 # Download dependencies. This is done as a separate step to leverage Docker's layer caching.
