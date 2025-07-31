@@ -11,16 +11,10 @@ import org.example.roomschedulerapi.classroomscheduler.repository.ClassRepositor
 import org.example.roomschedulerapi.classroomscheduler.repository.RoomRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.ScheduleRepository;
 import org.example.roomschedulerapi.classroomscheduler.service.ScheduleService;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,43 +29,36 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     @Override
     public List<ScheduleResponseDto> getSchedulesForInstructor(Long instructorId) {
-        // 1. Fetch all classes and create a set of un-archived class IDs.
         Set<Long> unarchivedClassIds = classRepository.findAll().stream()
                 .filter(c -> !c.isArchived())
                 .map(Class::getClassId)
                 .collect(Collectors.toSet());
 
-        // 2. Get all permanent schedules for the instructor, filtering by un-archived classes.
         List<Schedule> permanentSchedules = scheduleRepository.findSchedulesByInstructorId(instructorId)
                 .stream()
                 .filter(schedule -> unarchivedClassIds.contains(schedule.getAClass().getClassId()))
                 .collect(Collectors.toList());
 
-        // 3. Find all approved change requests linked to these permanent schedules.
         List<ChangeRequest> allOverrides = changeRequestRepository.findActiveApprovedChangesForSchedules(permanentSchedules, LocalDate.now());
 
-        // 4. Create a Set of schedule IDs that have been moved, ignoring any with null original schedules.
         Set<Long> movedScheduleIds = allOverrides.stream()
-                .filter(cr -> cr.getOriginalSchedule() != null) // FIX: Prevent NullPointerException
+                .filter(cr -> cr.getOriginalSchedule() != null)
                 .map(cr -> cr.getOriginalSchedule().getScheduleId())
                 .collect(Collectors.toSet());
 
         List<ScheduleResponseDto> finalSchedules = new ArrayList<>();
 
-        // 5. Add permanent schedules that have NOT been moved.
         for (Schedule schedule : permanentSchedules) {
             if (!movedScheduleIds.contains(schedule.getScheduleId())) {
                 finalSchedules.add(convertToDtoForInstructor(schedule, instructorId));
             }
         }
 
-        // 6. Add the temporary schedules from the overrides.
         for (ChangeRequest override : allOverrides) {
-            if (override.getOriginalSchedule() != null) { // FIX: Prevent NullPointerException
+            if (override.getOriginalSchedule() != null) {
                 finalSchedules.add(convertToDtoFromOverride(override.getOriginalSchedule(), instructorId, override));
             }
         }
-
         return finalSchedules;
     }
 
@@ -133,7 +120,6 @@ public class ScheduleServiceImpl implements ScheduleService {
                 finalSchedules.add(convertToDtoFromConferenceRoomBooking(override));
             }
         }
-
         return finalSchedules;
     }
 
@@ -176,21 +162,27 @@ public class ScheduleServiceImpl implements ScheduleService {
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + dto.getClassId()));
         Room room = roomRepository.findById(dto.getRoomId())
                 .orElseThrow(() -> new NoSuchElementException("Room not found with id: " + dto.getRoomId()));
+
         if (scheduleRepository.existsByaClass(aClass)) {
             throw new IllegalStateException("Class " + aClass.getClassName() + " is already assigned to a room");
         }
+
         List<DaysOfWeek> classDays = aClass.getClassInstructors().stream()
                 .map(ClassInstructor::getDayOfWeek).collect(Collectors.toList());
+
         if (classDays.isEmpty()) {
             throw new IllegalStateException("Class has no scheduled days");
         }
+
         Shift classShift = aClass.getShift();
         if (classShift == null) {
             throw new IllegalStateException("Class has no assigned shift");
         }
+
         List<Schedule> conflictingSchedules = scheduleRepository.findConflictingSchedules(
                 room.getRoomId(), classDays, classShift.getStartTime(), classShift.getEndTime()
         );
+
         if (!conflictingSchedules.isEmpty()) {
             String conflictingClasses = conflictingSchedules.stream()
                     .map(s -> s.getAClass().getClassName()).collect(Collectors.joining(", "));
@@ -199,6 +191,7 @@ public class ScheduleServiceImpl implements ScheduleService {
                             conflictingClasses + " during the requested time"
             );
         }
+
         Schedule newSchedule = new Schedule();
         newSchedule.setAClass(aClass);
         newSchedule.setRoom(room);
@@ -221,15 +214,15 @@ public class ScheduleServiceImpl implements ScheduleService {
         Room room = schedule.getRoom();
         Shift shiftEntity = aClass.getShift();
         ShiftResponseDto shiftDto = new ShiftResponseDto(shiftEntity.getShiftId(), shiftEntity.getStartTime(), shiftEntity.getEndTime(), shiftEntity.getName());
+
         List<DayDetailDto> dayDetails = aClass.getClassInstructors().stream()
-                .map(ci -> new DayDetailDto(ci.getDayOfWeek().name(), ci.isOnline(), ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName()))
+                .map(ci -> new DayDetailDto(ci.getDayOfWeek().name(), ci.isOnline(), ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(), null, null, null, null, null, null))
                 .collect(Collectors.toList());
 
         return new ScheduleResponseDto(
                 schedule.getScheduleId(), aClass.getClassId(), aClass.getClassName(), dayDetails,
                 aClass.getGeneration(), aClass.getSemester(), shiftDto, room.getRoomId(),
-                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived(),
-                null, null, null, null // EventName and temporary fields are null for a regular schedule
+                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived()
         );
     }
 
@@ -241,118 +234,141 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         List<DayDetailDto> dayDetails = aClass.getClassInstructors().stream()
                 .filter(ci -> ci.getInstructor().getInstructorId().equals(instructorId))
-                .map(ci -> new DayDetailDto(ci.getDayOfWeek().name(), ci.isOnline(), ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName()))
+                .map(ci -> new DayDetailDto(ci.getDayOfWeek().name(), ci.isOnline(), ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(), null, null, null, null, null, null))
                 .collect(Collectors.toList());
 
         return new ScheduleResponseDto(
                 schedule.getScheduleId(), aClass.getClassId(), aClass.getClassName(), dayDetails,
                 aClass.getGeneration(), aClass.getSemester(), shiftDto, room.getRoomId(),
-                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived(),
-                null, null, null, null // EventName and temporary fields are null for a regular schedule
+                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived()
         );
     }
 
+
     private ScheduleResponseDto convertToDtoFromOverride(Schedule originalSchedule, ChangeRequest override) {
-        // Start with the original schedule's data
         ScheduleResponseDto dto = convertToDto(originalSchedule);
+        Room tempRoom = override.getTemporaryRoom();
+        LocalDate effectiveDate = override.getEffectiveDate();
 
-        // Set the temporary room details from the override
-        dto.setTemporaryRoomId(override.getTemporaryRoom().getRoomId());
-        dto.setTemporaryRoomName(override.getTemporaryRoom().getRoomName());
-        dto.setTemporaryBuildingName(override.getTemporaryRoom().getBuildingName());
-
-        // Update the day of the week based on the override's effective date
-        String newDayOfWeek = override.getEffectiveDate().getDayOfWeek().name();
-        dto.getDayDetails().forEach(dd -> dd.setDayOfWeek(newDayOfWeek));
-
-        // Set the event name from the change request
-        dto.setEventName(override.getEventName());
-
+        dto.getDayDetails().forEach(detail -> {
+            if (effectiveDate.getDayOfWeek().name().equalsIgnoreCase(detail.getDayOfWeek())) {
+                detail.setEffectiveDate(effectiveDate);
+                detail.setEventName(override.getDescription());
+                detail.setTemporaryRoomId(tempRoom.getRoomId());
+                detail.setTemporaryRoomName(tempRoom.getRoomName());
+                detail.setTemporaryBuildingName(tempRoom.getBuildingName());
+                if (override.getShift() != null) {
+                    Shift tempShift = override.getShift();
+                    detail.setTemporaryShift(new ShiftResponseDto(tempShift.getShiftId(), tempShift.getStartTime(), tempShift.getEndTime(), tempShift.getName()));
+                }
+            }
+        });
         return dto;
     }
+
+
     private ScheduleResponseDto convertToDtoFromOverride(Schedule originalSchedule, Long instructorId, ChangeRequest override) {
-        // Start with the original schedule's data for the specific instructor
         ScheduleResponseDto dto = convertToDtoForInstructor(originalSchedule, instructorId);
+        Room tempRoom = override.getTemporaryRoom();
+        LocalDate effectiveDate = override.getEffectiveDate();
 
-        // Set the temporary room details from the override
-        dto.setTemporaryRoomId(override.getTemporaryRoom().getRoomId());
-        dto.setTemporaryRoomName(override.getTemporaryRoom().getRoomName());
-        dto.setTemporaryBuildingName(override.getTemporaryRoom().getBuildingName());
-
-        // Update the day of the week based on the override's effective date
-        String newDayOfWeek = override.getEffectiveDate().getDayOfWeek().name();
-        dto.getDayDetails().forEach(dd -> dd.setDayOfWeek(newDayOfWeek));
-
-        // Set the event name from the change request
-        dto.setEventName(override.getEventName());
-
+        dto.getDayDetails().forEach(detail -> {
+            if (effectiveDate.getDayOfWeek().name().equalsIgnoreCase(detail.getDayOfWeek())) {
+                detail.setEffectiveDate(effectiveDate);
+                detail.setEventName(override.getDescription());
+                detail.setTemporaryRoomId(tempRoom.getRoomId());
+                detail.setTemporaryRoomName(tempRoom.getRoomName());
+                detail.setTemporaryBuildingName(tempRoom.getBuildingName());
+                if (override.getShift() != null) {
+                    Shift tempShift = override.getShift();
+                    detail.setTemporaryShift(new ShiftResponseDto(tempShift.getShiftId(), tempShift.getStartTime(), tempShift.getEndTime(), tempShift.getName()));
+                }
+            }
+        });
         return dto;
     }
+
 
     private ScheduleResponseDto convertToDtoFromConferenceRoomBooking(ChangeRequest changeRequest) {
         Room room = changeRequest.getTemporaryRoom();
         Instructor instructor = changeRequest.getRequestingInstructor();
+        ShiftResponseDto tempShiftDto = null;
+        if (changeRequest.getShift() != null) {
+            Shift tempShift = changeRequest.getShift();
+            tempShiftDto = new ShiftResponseDto(tempShift.getShiftId(), tempShift.getStartTime(), tempShift.getEndTime(), tempShift.getName());
+        }
 
         List<DayDetailDto> dayDetails = new ArrayList<>();
-        dayDetails.add(new DayDetailDto(changeRequest.getEffectiveDate().getDayOfWeek().name(), false, instructor.getFirstName() + " " + instructor.getLastName()));
+        dayDetails.add(new DayDetailDto(
+                changeRequest.getEffectiveDate().getDayOfWeek().name(),
+                false,
+                instructor.getFirstName() + " " + instructor.getLastName(),
+                changeRequest.getDescription(),
+                room.getRoomId(),
+                room.getRoomName(),
+                room.getBuildingName(),
+                changeRequest.getEffectiveDate(),
+                tempShiftDto
+        ));
 
-        ShiftResponseDto shiftDto = new ShiftResponseDto(null, null, null, "Booked");
-
-        String className = (changeRequest.getEventName() != null && !changeRequest.getEventName().isEmpty())
-                ? changeRequest.getEventName()
+        String className = (changeRequest.getDescription() != null && !changeRequest.getDescription().isEmpty())
+                ? changeRequest.getDescription()
                 : "Booked by " + instructor.getFirstName() + " " + instructor.getLastName();
 
         return new ScheduleResponseDto(
                 null, null, className, dayDetails, null, null,
-                shiftDto, room.getRoomId(), room.getRoomName(), room.getBuildingName(),
-                "Conference Room", false, changeRequest.getEventName(),
-                null, null, null // No temporary room for a direct booking
+                null, room.getRoomId(), room.getRoomName(), room.getBuildingName(),
+                "Conference Room", false
         );
     }
 
     private ScheduleResponseDto convertUnscheduledClassToDto(Class aClass) {
         Shift shiftEntity = aClass.getShift();
-        ShiftResponseDto shiftDto = new ShiftResponseDto(shiftEntity.getShiftId(), shiftEntity.getStartTime(), shiftEntity.getEndTime(), shiftEntity.getName());
+        ShiftResponseDto shiftDto = new ShiftResponseDto(
+                shiftEntity.getShiftId(),
+                shiftEntity.getStartTime(),
+                shiftEntity.getEndTime(),
+                shiftEntity.getName()
+        );
+
         boolean isClassOnline = aClass.getClassInstructors().stream().anyMatch(ClassInstructor::isOnline);
         String roomName = isClassOnline ? "Online" : "Unassigned";
         String buildingName = isClassOnline ? "N/A" : "TBD";
+
         List<DayDetailDto> dayDetails = aClass.getClassInstructors().stream()
-                .map(ci -> new DayDetailDto(ci.getDayOfWeek().name(), ci.isOnline(), ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName()))
+                .map(ci -> new DayDetailDto(
+                        ci.getDayOfWeek().name(),
+                        ci.isOnline(),
+                        ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(),
+                        null, null, null, null, null, null
+                ))
                 .collect(Collectors.toList());
 
         return new ScheduleResponseDto(
-                null, aClass.getClassId(), aClass.getClassName(), dayDetails, aClass.getGeneration(),
-                aClass.getSemester(), shiftDto, null, roomName, buildingName, aClass.getMajorName(), aClass.isArchived(),
-                null, null, null, null // EventName and temporary fields are null for an unscheduled class
+                null, aClass.getClassId(), aClass.getClassName(), dayDetails,
+                aClass.getGeneration(), aClass.getSemester(), shiftDto, null,
+                roomName, buildingName, aClass.getMajorName(), aClass.isArchived()
         );
     }
 
     @Override
     @Transactional
     public ScheduleResponseDto revertTemporaryMove(Long scheduleId) {
-        // 1. Ensure the original schedule actually exists
         Schedule originalSchedule = scheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Schedule", "id", scheduleId));
 
-        // 2. Find all active change requests linked to this original schedule
         List<ChangeRequest> changeRequests = changeRequestRepository.findAllByOriginalSchedule_ScheduleId(scheduleId);
 
         if (changeRequests.isEmpty()) {
             System.out.println("No active change request found to revert for schedule ID: " + scheduleId);
         } else {
-            // 3. Update the status of each found request to DENIED
             for (ChangeRequest request : changeRequests) {
-                // We only deny pending or approved requests. A denied request should not be re-denied.
                 if (request.getStatus() == RequestStatus.PENDING || request.getStatus() == RequestStatus.APPROVED) {
                     request.setStatus(RequestStatus.DENIED);
                 }
             }
-            // 4. Save the updated requests back to the database
             changeRequestRepository.saveAll(changeRequests);
         }
-
-        // 5. Return the original schedule's DTO, which is now the active one.
         return convertToDto(originalSchedule);
     }
-
 }

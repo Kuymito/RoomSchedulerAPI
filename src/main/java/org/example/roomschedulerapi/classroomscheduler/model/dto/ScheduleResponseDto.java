@@ -13,23 +13,13 @@ public class ScheduleResponseDto {
     private Long scheduleId;
     private Long classId;
     private String className;
-    private List<DayDetailDto> dayDetails;
+    private List<DayDetailDto> dayDetails; // Contains all day-specific info
     private String year;
     private String semester;
     private ShiftResponseDto shift;
-
-    // Original Room Details
     private Long roomId;
     private String roomName;
     private String buildingName;
-
-    // General Details
     private String majorName;
     private boolean isArchived;
-    private String eventName;
-
-    // Temporary Room Details
-    private Long temporaryRoomId;
-    private String temporaryRoomName;
-    private String temporaryBuildingName;
 }

@@ -39,6 +39,13 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
         }
 
         // --- VALIDATION LOGIC ---
+        if (requestDto.getScheduleId() != null) {
+            List<ChangeRequest> existingApprovedRequests = changeRequestRepository.findApprovedChangeRequestsForSchedule(requestDto.getScheduleId());
+            if (!existingApprovedRequests.isEmpty()) {
+                throw new IllegalStateException("This class already has an approved temporary schedule change. Another request cannot be submitted.");
+            }
+        }
+
         // Check for overlapping requests before creating a new one.
         if (shift != null) {
             List<RequestStatus> conflictingStatuses = List.of(RequestStatus.PENDING, RequestStatus.APPROVED);

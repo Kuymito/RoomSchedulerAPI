@@ -57,4 +57,9 @@ public interface ChangeRequestRepository extends JpaRepository<ChangeRequest, Lo
     long deleteByOriginalSchedule_ScheduleId(Long scheduleId);
 
     List<ChangeRequest> findAllByOriginalSchedule_ScheduleId(Long scheduleId);
+
+    @Query("SELECT cr FROM ChangeRequest cr " +
+            "WHERE cr.originalSchedule.id = :scheduleId " +
+            "AND cr.status = 'APPROVED'")
+    List<ChangeRequest> findApprovedChangeRequestsForSchedule(Long scheduleId);
 }
