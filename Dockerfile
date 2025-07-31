@@ -9,7 +9,7 @@ WORKDIR /app
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
 
-# Add execute permission to the Maven wrapper
+# Add execute permission to the Maven wrapper to prevent build errors
 RUN chmod +x ./mvnw
 
 # Download dependencies to leverage Docker's layer caching
@@ -22,7 +22,7 @@ COPY src ./src
 RUN ./mvnw package -DskipTests
 
 # Stage 2: Create the final, lightweight production image
-# --- FIX: Use a different, more reliable Java 21 runtime image ---
+# Use a minimal and reliable Java 21 runtime image
 FROM eclipse-temurin:21-jre as final
 
 WORKDIR /app
