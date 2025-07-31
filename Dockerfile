@@ -12,23 +12,26 @@ COPY mvnw pom.xml ./
 # Add execute permission to the Maven wrapper
 RUN chmod +x ./mvnw
 
-# Download dependencies. This is done as a separate step to leverage Docker's layer caching.
+# Download dependencies to leverage Docker's layer caching
 RUN ./mvnw dependency:go-offline
 
 # Copy the rest of the application's source code
 COPY src ./src
 
-# Build the application, creating the executable JAR file.
-# We skip tests to make the cloud build faster.
-RUN ./mvnw spring-boot:build-image -DskipTests
+# --- FIX: Package the application into a JAR file, don't build an image ---
+RUN ./mvnw package -DskipTests
 
 # Stage 2: Create the final, lightweight production image
-# We use an official OpenJDK image which is smaller than the Maven image
-FROM springboot/build-image
+# Use a minimal Java 21 runtime
+FROM openjdk:21-jre-slim as final
 
-# Expose the port that your Spring Boot application runs on (default is 8080)
+WORKDIR /app
+
+# Copy the executable JAR from the build stage to the final image
+COPY --from=build /app/target/RoomSchedulerAPI-0.0.1-SNAPSHOT.jar app.jar
+
+# Expose the port that your Spring Boot application runs on
 EXPOSE 8080
 
 # The command to run your application
-# The JAR file is automatically located in the /workspace directory by the build-image command
-CMD ["java", "-jar", "/workspace/application.jar"]
+CMD ["java", "-jar", "app.jar"]
