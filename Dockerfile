@@ -18,12 +18,12 @@ RUN ./mvnw dependency:go-offline
 # Copy the rest of the application's source code
 COPY src ./src
 
-# --- FIX: Package the application into a JAR file, don't build an image ---
+# Package the application into a JAR file, skipping tests
 RUN ./mvnw package -DskipTests
 
 # Stage 2: Create the final, lightweight production image
-# Use a minimal Java 21 runtime
-FROM openjdk:21-jre-slim as final
+# --- FIX: Use a different, more reliable Java 21 runtime image ---
+FROM eclipse-temurin:21-jre as final
 
 WORKDIR /app
 
