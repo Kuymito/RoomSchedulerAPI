@@ -110,6 +110,12 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.google.cloud</groupId>
+            <artifactId>cloud-sql-jdbc-socket-factory-postgresql</artifactId>
+            <version>1.14.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>
