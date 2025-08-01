@@ -1,10 +1,19 @@
 package org.example.roomschedulerapi.classroomscheduler.service.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.example.roomschedulerapi.classroomscheduler.model.*;
-import org.example.roomschedulerapi.classroomscheduler.model.Class;
-import org.example.roomschedulerapi.classroomscheduler.model.dto.*;
 import org.example.roomschedulerapi.classroomscheduler.exception.ResourceNotFoundException;
+import org.example.roomschedulerapi.classroomscheduler.model.Class;
+import org.example.roomschedulerapi.classroomscheduler.model.ChangeRequest;
+import org.example.roomschedulerapi.classroomscheduler.model.DaysOfWeek;
+import org.example.roomschedulerapi.classroomscheduler.model.Instructor;
+import org.example.roomschedulerapi.classroomscheduler.model.Room;
+import org.example.roomschedulerapi.classroomscheduler.model.Schedule;
+import org.example.roomschedulerapi.classroomscheduler.model.Shift;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.DayDetailDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleRequestDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleResponseDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.ScheduleSwapDto;
+import org.example.roomschedulerapi.classroomscheduler.model.dto.ShiftResponseDto;
 import org.example.roomschedulerapi.classroomscheduler.model.enums.RequestStatus;
 import org.example.roomschedulerapi.classroomscheduler.repository.ChangeRequestRepository;
 import org.example.roomschedulerapi.classroomscheduler.repository.ClassRepository;
@@ -15,7 +24,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -158,25 +171,29 @@ public class ScheduleServiceImpl implements ScheduleService {
     @Transactional
     @Override
     public ScheduleResponseDto assignRoomToClass(ScheduleRequestDto dto) {
+        // 1. Fetch the Class and the Room.
         Class aClass = classRepository.findById(dto.getClassId())
                 .orElseThrow(() -> new NoSuchElementException("Class not found with id: " + dto.getClassId()));
         Room room = roomRepository.findById(dto.getRoomId())
                 .orElseThrow(() -> new NoSuchElementException("Room not found with id: " + dto.getRoomId()));
 
+        // **REVERTED LOGIC**:
+        // A schedule for this class should not exist yet. Check for duplicates just in case.
         if (scheduleRepository.existsByaClass(aClass)) {
-            throw new IllegalStateException("Class " + aClass.getClassName() + " is already assigned to a room");
+            throw new IllegalStateException("This class is already scheduled in a room. To move it, please drag and drop the schedule.");
         }
 
+        // 2. Perform Conflict Checking.
         List<DaysOfWeek> classDays = aClass.getClassInstructors().stream()
-                .map(ClassInstructor::getDayOfWeek).collect(Collectors.toList());
+                .map(ci -> ci.getDayOfWeek()).collect(Collectors.toList());
 
         if (classDays.isEmpty()) {
-            throw new IllegalStateException("Class has no scheduled days");
+            throw new IllegalStateException("Cannot schedule class: No instructors or days have been assigned.");
         }
 
         Shift classShift = aClass.getShift();
         if (classShift == null) {
-            throw new IllegalStateException("Class has no assigned shift");
+            throw new IllegalStateException("Class has no assigned shift.");
         }
 
         List<Schedule> conflictingSchedules = scheduleRepository.findConflictingSchedules(
@@ -188,25 +205,37 @@ public class ScheduleServiceImpl implements ScheduleService {
                     .map(s -> s.getAClass().getClassName()).collect(Collectors.joining(", "));
             throw new IllegalStateException(
                     "Room " + room.getRoomName() + " is already occupied by class(es): " +
-                            conflictingClasses + " during the requested time"
+                            conflictingClasses + " during the requested time."
             );
         }
 
+        // 3. Create and save the NEW Schedule.
         Schedule newSchedule = new Schedule();
         newSchedule.setAClass(aClass);
         newSchedule.setRoom(room);
+
         Schedule savedSchedule = scheduleRepository.save(newSchedule);
         return convertToDto(savedSchedule);
     }
 
-    @Transactional
     @Override
+    @Transactional
     public void unassignRoomFromClass(Long scheduleId) {
-        if (!scheduleRepository.existsById(scheduleId)) {
-            throw new NoSuchElementException("Schedule not found with id: " + scheduleId);
+        // 1. Find the schedule to ensure it exists.
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new NoSuchElementException("Schedule not found with id: " + scheduleId));
+
+        // 2. Find all change requests that reference this schedule.
+        List<ChangeRequest> associatedRequests = changeRequestRepository.findAllByOriginalSchedule_ScheduleId(scheduleId);
+
+        // 3. Explicitly delete the associated change requests.
+        // This ensures all child records are removed before the parent.
+        if (associatedRequests != null && !associatedRequests.isEmpty()) {
+            changeRequestRepository.deleteAll(associatedRequests);
         }
-        changeRequestRepository.deleteAllByOriginalSchedule_ScheduleId(scheduleId);
-        scheduleRepository.deleteById(scheduleId);
+
+        // 4. Now that all references are gone, it is safe to delete the schedule.
+        scheduleRepository.delete(schedule);
     }
 
     private ScheduleResponseDto convertToDto(Schedule schedule) {
@@ -216,13 +245,22 @@ public class ScheduleServiceImpl implements ScheduleService {
         ShiftResponseDto shiftDto = new ShiftResponseDto(shiftEntity.getShiftId(), shiftEntity.getStartTime(), shiftEntity.getEndTime(), shiftEntity.getName());
 
         List<DayDetailDto> dayDetails = aClass.getClassInstructors().stream()
-                .map(ci -> new DayDetailDto(ci.getDayOfWeek().name(), ci.isOnline(), ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(), null, null, null, null, null, null))
+                .map(ci -> new DayDetailDto(
+                        ci.getDayOfWeek().name(),
+                        ci.isOnline(),
+                        ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(),
+                        null, null, null, null, null, null, null // All temporary fields are null
+                ))
                 .collect(Collectors.toList());
+
+        String roomName = (room != null) ? room.getRoomName() : "Unassigned";
+        String buildingName = (room != null) ? room.getBuildingName() : "TBD";
+        Long roomId = (room != null) ? room.getRoomId() : null;
 
         return new ScheduleResponseDto(
                 schedule.getScheduleId(), aClass.getClassId(), aClass.getClassName(), dayDetails,
-                aClass.getGeneration(), aClass.getSemester(), shiftDto, room.getRoomId(),
-                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived()
+                aClass.getGeneration(), aClass.getSemester(), shiftDto, roomId,
+                roomName, buildingName, aClass.getMajorName(), aClass.isArchived()
         );
     }
 
@@ -234,58 +272,65 @@ public class ScheduleServiceImpl implements ScheduleService {
 
         List<DayDetailDto> dayDetails = aClass.getClassInstructors().stream()
                 .filter(ci -> ci.getInstructor().getInstructorId().equals(instructorId))
-                .map(ci -> new DayDetailDto(ci.getDayOfWeek().name(), ci.isOnline(), ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(), null, null, null, null, null, null))
+                .map(ci -> new DayDetailDto(
+                        ci.getDayOfWeek().name(),
+                        ci.isOnline(),
+                        ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(),
+                        null, null, null, null, null, null, null // All temporary fields are null
+                ))
                 .collect(Collectors.toList());
+
+        String roomName = (room != null) ? room.getRoomName() : "Unassigned";
+        String buildingName = (room != null) ? room.getBuildingName() : "TBD";
+        Long roomId = (room != null) ? room.getRoomId() : null;
 
         return new ScheduleResponseDto(
                 schedule.getScheduleId(), aClass.getClassId(), aClass.getClassName(), dayDetails,
-                aClass.getGeneration(), aClass.getSemester(), shiftDto, room.getRoomId(),
-                room.getRoomName(), room.getBuildingName(), aClass.getMajorName(), aClass.isArchived()
+                aClass.getGeneration(), aClass.getSemester(), shiftDto, roomId,
+                roomName, buildingName, aClass.getMajorName(), aClass.isArchived()
         );
     }
 
 
     private ScheduleResponseDto convertToDtoFromOverride(Schedule originalSchedule, ChangeRequest override) {
         ScheduleResponseDto dto = convertToDto(originalSchedule);
-        Room tempRoom = override.getTemporaryRoom();
-        LocalDate effectiveDate = override.getEffectiveDate();
-
-        dto.getDayDetails().forEach(detail -> {
-            if (effectiveDate.getDayOfWeek().name().equalsIgnoreCase(detail.getDayOfWeek())) {
-                detail.setEffectiveDate(effectiveDate);
-                detail.setEventName(override.getDescription());
-                detail.setTemporaryRoomId(tempRoom.getRoomId());
-                detail.setTemporaryRoomName(tempRoom.getRoomName());
-                detail.setTemporaryBuildingName(tempRoom.getBuildingName());
-                if (override.getShift() != null) {
-                    Shift tempShift = override.getShift();
-                    detail.setTemporaryShift(new ShiftResponseDto(tempShift.getShiftId(), tempShift.getStartTime(), tempShift.getEndTime(), tempShift.getName()));
-                }
-            }
-        });
+        if (!dto.getDayDetails().isEmpty()) {
+            DayDetailDto dayDetailToUpdate = dto.getDayDetails().get(0);
+            applyTemporaryDetails(dayDetailToUpdate, override);
+        }
         return dto;
     }
 
 
     private ScheduleResponseDto convertToDtoFromOverride(Schedule originalSchedule, Long instructorId, ChangeRequest override) {
         ScheduleResponseDto dto = convertToDtoForInstructor(originalSchedule, instructorId);
+        if (!dto.getDayDetails().isEmpty()) {
+            DayDetailDto dayDetailToUpdate = dto.getDayDetails().get(0);
+            applyTemporaryDetails(dayDetailToUpdate, override);
+        }
+        return dto;
+    }
+
+    private void applyTemporaryDetails(DayDetailDto dayDetail, ChangeRequest override) {
         Room tempRoom = override.getTemporaryRoom();
         LocalDate effectiveDate = override.getEffectiveDate();
 
-        dto.getDayDetails().forEach(detail -> {
-            if (effectiveDate.getDayOfWeek().name().equalsIgnoreCase(detail.getDayOfWeek())) {
-                detail.setEffectiveDate(effectiveDate);
-                detail.setEventName(override.getDescription());
-                detail.setTemporaryRoomId(tempRoom.getRoomId());
-                detail.setTemporaryRoomName(tempRoom.getRoomName());
-                detail.setTemporaryBuildingName(tempRoom.getBuildingName());
-                if (override.getShift() != null) {
-                    Shift tempShift = override.getShift();
-                    detail.setTemporaryShift(new ShiftResponseDto(tempShift.getShiftId(), tempShift.getStartTime(), tempShift.getEndTime(), tempShift.getName()));
-                }
-            }
-        });
-        return dto;
+        dayDetail.setEventName(override.getDescription());
+        dayDetail.setEffectiveDate(effectiveDate);
+        dayDetail.setTemporaryDay(effectiveDate.getDayOfWeek().name());
+        dayDetail.setTemporaryRoomId(tempRoom.getRoomId());
+        dayDetail.setTemporaryRoomName(tempRoom.getRoomName());
+        dayDetail.setTemporaryBuildingName(tempRoom.getBuildingName());
+
+        if (override.getShift() != null) {
+            Shift tempShift = override.getShift();
+            dayDetail.setTemporaryShift(new ShiftResponseDto(
+                    tempShift.getShiftId(),
+                    tempShift.getStartTime(),
+                    tempShift.getEndTime(),
+                    tempShift.getName()
+            ));
+        }
     }
 
 
@@ -298,56 +343,27 @@ public class ScheduleServiceImpl implements ScheduleService {
             tempShiftDto = new ShiftResponseDto(tempShift.getShiftId(), tempShift.getStartTime(), tempShift.getEndTime(), tempShift.getName());
         }
 
-        List<DayDetailDto> dayDetails = new ArrayList<>();
-        dayDetails.add(new DayDetailDto(
+        DayDetailDto dayDetail = new DayDetailDto(
                 changeRequest.getEffectiveDate().getDayOfWeek().name(),
                 false,
                 instructor.getFirstName() + " " + instructor.getLastName(),
                 changeRequest.getDescription(),
+                changeRequest.getEffectiveDate().getDayOfWeek().name(),
                 room.getRoomId(),
                 room.getRoomName(),
                 room.getBuildingName(),
                 changeRequest.getEffectiveDate(),
                 tempShiftDto
-        ));
+        );
 
         String className = (changeRequest.getDescription() != null && !changeRequest.getDescription().isEmpty())
                 ? changeRequest.getDescription()
                 : "Booked by " + instructor.getFirstName() + " " + instructor.getLastName();
 
         return new ScheduleResponseDto(
-                null, null, className, dayDetails, null, null,
+                null, null, className, List.of(dayDetail), null, null,
                 null, room.getRoomId(), room.getRoomName(), room.getBuildingName(),
                 "Conference Room", false
-        );
-    }
-
-    private ScheduleResponseDto convertUnscheduledClassToDto(Class aClass) {
-        Shift shiftEntity = aClass.getShift();
-        ShiftResponseDto shiftDto = new ShiftResponseDto(
-                shiftEntity.getShiftId(),
-                shiftEntity.getStartTime(),
-                shiftEntity.getEndTime(),
-                shiftEntity.getName()
-        );
-
-        boolean isClassOnline = aClass.getClassInstructors().stream().anyMatch(ClassInstructor::isOnline);
-        String roomName = isClassOnline ? "Online" : "Unassigned";
-        String buildingName = isClassOnline ? "N/A" : "TBD";
-
-        List<DayDetailDto> dayDetails = aClass.getClassInstructors().stream()
-                .map(ci -> new DayDetailDto(
-                        ci.getDayOfWeek().name(),
-                        ci.isOnline(),
-                        ci.getInstructor().getFirstName() + " " + ci.getInstructor().getLastName(),
-                        null, null, null, null, null, null
-                ))
-                .collect(Collectors.toList());
-
-        return new ScheduleResponseDto(
-                null, aClass.getClassId(), aClass.getClassName(), dayDetails,
-                aClass.getGeneration(), aClass.getSemester(), shiftDto, null,
-                roomName, buildingName, aClass.getMajorName(), aClass.isArchived()
         );
     }
 

@@ -87,7 +87,7 @@ public class ClassServiceImpl implements ClassService {
         DepartmentResponseDto departmentDto = (aClass.getDepartment() != null) ?
                 new DepartmentResponseDto(aClass.getDepartment().getDepartmentId(), aClass.getDepartment().getName()) : null;
         ShiftResponseDto shiftDto = (aClass.getShift() != null) ?
-                new ShiftResponseDto(aClass.getShift().getShiftId(), aClass.getShift().getStartTime(), aClass.getShift().getEndTime()) : null;
+                new ShiftResponseDto(aClass.getShift().getShiftId(), aClass.getShift().getStartTime(), aClass.getShift().getEndTime(), aClass.getShift().getName()) : null;
 
 
         return new ClassResponseDto(aClass.getClassId(), aClass.getClassName(), aClass.getGeneration(), aClass.getGroupName(), aClass.getMajorName(),
@@ -287,7 +287,6 @@ public class ClassServiceImpl implements ClassService {
         Instructor instructorToAssign = instructorRepository.findById(assignInstructorDto.getInstructorId())
                 .orElseThrow(() -> new NoSuchElementException("Instructor not found with id: " + assignInstructorDto.getInstructorId()));
 
-        // Check if the instructor is archived
         if (instructorToAssign.isArchived()) {
             throw new IllegalArgumentException("Cannot assign an archived instructor.");
         }
@@ -295,58 +294,33 @@ public class ClassServiceImpl implements ClassService {
         DaysOfWeek dayToAssign = DaysOfWeek.valueOf(assignInstructorDto.getDayOfWeek().toUpperCase());
         Shift classShift = existingClass.getShift();
 
-        // --- CONFLICT DETECTION LOGIC ---
-        // Find all other classes this instructor is assigned to.
-        List<ClassInstructor> instructorAssignments = classInstructorRepository.findByInstructor(instructorToAssign);
+        checkForInstructorConflict(instructorToAssign, dayToAssign, classShift, existingClass.getClassId());
 
-        for (ClassInstructor assignment : instructorAssignments) {
-            // Check if the assignment is on the same day and in the same shift
-            boolean isSameDay = assignment.getDayOfWeek().equals(dayToAssign);
-            boolean isSameShift = assignment.getAClass().getShift().getShiftId().equals(classShift.getShiftId());
-            // Make sure we are not comparing the class to itself
-            boolean isDifferentClass = !assignment.getAClass().getClassId().equals(existingClass.getClassId());
-
-            if (isSameDay && isSameShift && isDifferentClass) {
-                // If a conflict is found, throw the custom exception.
-                throw new InstructorConflictException(
-                        "Conflict: Instructor " + instructorToAssign.getFirstName() + " " + instructorToAssign.getLastName() +
-                                " is already scheduled for another class (" + assignment.getAClass().getClassName() +
-                                ") at this time."
-                );
-            }
-        }
-        // --- END OF CONFLICT DETECTION ---
-
-
-        // Check for existing assignment on this day for this specific class
         Optional<ClassInstructor> existingAssignment = existingClass.getClassInstructors().stream()
                 .filter(ci -> ci.getDayOfWeek().equals(dayToAssign))
                 .findFirst();
 
         if (existingAssignment.isPresent()) {
             ClassInstructor currentAssignment = existingAssignment.get();
-            // If the day is already assigned, but to a different instructor, it's a conflict within the class itself.
             if (!currentAssignment.getInstructor().equals(instructorToAssign)) {
                 throw new InstructorConflictException(
                         "Day " + dayToAssign + " is already assigned to another instructor for this class."
                 );
             }
-            // If it's the same instructor, just update the online status.
             currentAssignment.setOnline(assignInstructorDto.isOnline());
             classInstructorRepository.save(currentAssignment);
         } else {
-            // If no assignment exists for this day, create a new one.
             ClassInstructor newAssignment = new ClassInstructor();
             newAssignment.setAClass(existingClass);
             newAssignment.setInstructor(instructorToAssign);
             newAssignment.setDayOfWeek(dayToAssign);
             newAssignment.setOnline(assignInstructorDto.isOnline());
-
             existingClass.getClassInstructors().add(newAssignment);
             classInstructorRepository.save(newAssignment);
         }
 
-        // Return the updated class DTO
+        // **REMOVED**: The logic to automatically create a schedule has been removed from this method.
+
         return convertToDto(classRepository.save(existingClass));
     }
 

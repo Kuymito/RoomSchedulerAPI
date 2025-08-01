@@ -10,6 +10,7 @@ import org.example.roomschedulerapi.classroomscheduler.service.ChangeRequestServ
 import org.example.roomschedulerapi.classroomscheduler.service.NotificationService;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -40,13 +41,20 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
 
         // --- VALIDATION LOGIC ---
         if (requestDto.getScheduleId() != null) {
+            // **MODIFIED VALIDATION**:
+            // 1. Fetch all approved requests for the schedule.
             List<ChangeRequest> existingApprovedRequests = changeRequestRepository.findApprovedChangeRequestsForSchedule(requestDto.getScheduleId());
-            if (!existingApprovedRequests.isEmpty()) {
-                throw new IllegalStateException("This class already has an approved temporary schedule change. Another request cannot be submitted.");
+
+            // 2. Check if any of these requests are for a future date.
+            boolean hasActiveFutureRequest = existingApprovedRequests.stream()
+                    .anyMatch(req -> req.getEffectiveDate().isAfter(LocalDate.now()) || req.getEffectiveDate().isEqual(LocalDate.now()));
+
+            if (hasActiveFutureRequest) {
+                throw new IllegalStateException("This class already has an active or future temporary schedule change. Another request cannot be submitted until the current one has passed.");
             }
         }
 
-        // Check for overlapping requests before creating a new one.
+        // Check for overlapping room bookings for the same room, date, and shift.
         if (shift != null) {
             List<RequestStatus> conflictingStatuses = List.of(RequestStatus.PENDING, RequestStatus.APPROVED);
             boolean isOverlapping = changeRequestRepository.existsByTemporaryRoomAndEffectiveDateAndShiftAndStatusIn(
@@ -74,62 +82,46 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
 
         String adminMessage;
         String instructorMessage;
-
-        // Formatter for a more readable date
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
         String formattedDate = newRequest.getEffectiveDate().format(dateFormatter);
 
-        // If scheduleId is provided, it's a class change request
         if (requestDto.getScheduleId() != null) {
             Schedule schedule = scheduleRepository.findById(requestDto.getScheduleId())
                     .orElseThrow(() -> new NoSuchElementException("Schedule not found with id: " + requestDto.getScheduleId()));
             newRequest.setOriginalSchedule(schedule);
 
-            // UPDATED ADMIN MESSAGE
             adminMessage = String.format(
                     "Request from %s %s: Move class '%s' to room '%s' on %s (%s).",
-                    instructor.getFirstName(),
-                    instructor.getLastName(),
-                    schedule.getAClass().getClassName(),
-                    tempRoom.getRoomName(),
-                    formattedDate,
-                    shift != null ? shift.getName() : "N/A"
+                    instructor.getFirstName(), instructor.getLastName(),
+                    schedule.getAClass().getClassName(), tempRoom.getRoomName(),
+                    formattedDate, shift != null ? shift.getName() : "N/A"
             );
 
             instructorMessage = String.format(
                     "Your request to move class '%s' to room '%s' on %s has been submitted.",
-                    schedule.getAClass().getClassName(),
-                    tempRoom.getRoomName(),
-                    formattedDate
+                    schedule.getAClass().getClassName(), tempRoom.getRoomName(), formattedDate
             );
         } else {
-            // If scheduleId is null, it's a conference room booking
-            // UPDATED ADMIN MESSAGE
             adminMessage = String.format(
                     "Booking request from %s %s: Room '%s' on %s (%s).",
-                    instructor.getFirstName(),
-                    instructor.getLastName(),
-                    tempRoom.getRoomName(),
-                    formattedDate,
+                    instructor.getFirstName(), instructor.getLastName(),
+                    tempRoom.getRoomName(), formattedDate,
                     shift != null ? shift.getName() : "N/A"
             );
 
             instructorMessage = String.format(
                     "Your request to book conference room '%s' on %s has been submitted.",
-                    tempRoom.getRoomName(),
-                    formattedDate
+                    tempRoom.getRoomName(), formattedDate
             );
         }
 
         ChangeRequest savedRequest = changeRequestRepository.save(newRequest);
 
-        // --- NOTIFICATION LOGIC ---
         notificationService.createNotificationForAdmins(savedRequest, adminMessage);
         notificationService.createNotificationForInstructor(instructor.getInstructorId(), savedRequest, instructorMessage);
 
         return convertToDto(savedRequest);
     }
-
 
     @Override
     public List<ChangeRequestResponseDto> getAllChangeRequests() {
@@ -150,7 +142,7 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
                     "Your request for class '%s' on %s for room %s has been APPROVED.",
                     savedRequest.getOriginalSchedule().getAClass().getClassName(),
                     savedRequest.getEffectiveDate(),
-                    savedRequest.getTemporaryRoom().getRoomName() // FIX: Use getRoomName()
+                    savedRequest.getTemporaryRoom().getRoomName()
             );
         } else {
             message = String.format(
@@ -176,7 +168,7 @@ public class ChangeRequestServiceImpl implements ChangeRequestService {
                     "Your request for class '%s' on %s for room %s has been DENIED.",
                     savedRequest.getOriginalSchedule().getAClass().getClassName(),
                     savedRequest.getEffectiveDate(),
-                    savedRequest.getTemporaryRoom().getRoomName() // FIX: Use getRoomName()
+                    savedRequest.getTemporaryRoom().getRoomName()
             );
         } else {
             message = String.format(
