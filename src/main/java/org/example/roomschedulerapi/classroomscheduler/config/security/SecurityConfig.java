@@ -104,20 +104,4 @@ public class SecurityConfig {
 
         return http.build();
     }
-
-        @Bean
-        public CorsConfigurationSource corsConfigurationSource() {
-                CorsConfiguration configuration = new CorsConfiguration();
-
-                configuration.setAllowedOrigins(Arrays.asList("https://roomscheduler-1096936981338.europe-west1.run.app", "http://localhost:3000")); 
-
-                configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-                configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
-                configuration.setAllowCredentials(true);
-
-                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-                // This applies the CORS policy to all API paths
-                source.registerCorsConfiguration("/**", configuration); 
-                return source;
-        }
 }
