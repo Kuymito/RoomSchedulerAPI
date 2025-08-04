@@ -48,7 +48,6 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/api/v1/otp/**"
-
                         ).permitAll()
 
                         // 2. Admin-Only Write Permissions
@@ -84,8 +83,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/instructor/**").hasAnyRole("ADMIN", "INSTRUCTOR")
 
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/schedule/**").hasRole("ADMIN")
-
-
 
                         // 3. General Read Permissions for any authenticated user (Admin or Instructor)
                         .requestMatchers(HttpMethod.GET, "/api/v1/instructor/**", "/api/v1/room/**", "/api/v1/class/**", "/api/v1/department/**").authenticated()

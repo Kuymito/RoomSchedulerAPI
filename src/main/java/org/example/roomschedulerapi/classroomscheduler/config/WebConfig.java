@@ -12,7 +12,8 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**") // Apply to all API endpoints under /api/
                 .allowedOrigins(
                         "http://localhost:3000",                        // For local development
-                        "https://jaybird-new-previously.ngrok-free.app" // Your specific ngrok URL
+                        "https://jaybird-new-previously.ngrok-free.app", // Your specific ngrok URL
+                        "https://roomscheduler-1096936981338.europe-west1.run.app"
                         // You could also use a wildcard if your ngrok subdomain changes: "https://*.ngrok-free.app"
                 )
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS") // All methods your API uses
